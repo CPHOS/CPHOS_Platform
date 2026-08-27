@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.pgdata/
+.devmail/
+.env
+.env.local
+*.log
+.DS_Store

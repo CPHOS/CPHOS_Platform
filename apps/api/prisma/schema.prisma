@@ -1,0 +1,227 @@
+// CPHOS 新平台 · 核心数据模型（PostgreSQL / Prisma）
+// 设计依据：docs/02_新系统设计.md §6（实体模型草案）
+// 原则：认证与授权分离、状态机、审计留痕、外键/唯一约束、BigInt 主键（对齐旧库 ID 导入）
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- 枚举 ----------
+
+enum UserStatus {
+  PENDING // 待审核（含邮箱未验证）
+  ACTIVE // 正常
+  DISABLED // 已禁用
+}
+
+// 账号层级：SUPER_ADMIN（系统初始化、受保护）/ ADMIN（由超管提升）/ CPHOS_MEMBER（内部员工）/ PLATFORM_USER（普通用户）
+enum AccountRole {
+  SUPER_ADMIN
+  ADMIN
+  CPHOS_MEMBER
+  PLATFORM_USER
+}
+
+enum EmailCodePurpose {
+  REGISTER
+  RESET_PASSWORD
+  CHANGE_EMAIL
+}
+
+enum AuditApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AuditAction {
+  APPROVE // 审核通过
+  REJECT // 审核驳回
+  BIND_LEGACY // 认领绑定旧账号
+  REQUEST_MATERIAL // 要求补材料
+  UNBIND // 解绑/回退
+}
+
+enum MemberRole {
+  LEADER // 负责人
+  COACH // 附属教练（仲裁已改为功能模块，不再是身份）
+}
+
+// ---------- 认证域 ----------
+
+model UserAccount {
+  id              BigInt      @id @default(autoincrement())
+  email           String?     @unique // 仅平台用户有（登录+验证码）；内部账号为 NULL
+  loginName       String?     @unique // 内部账号用户名（小写规范化）；平台用户为 NULL
+  displayName     String? // 显示名称（内部账号建档时填写）
+  emailVerifiedAt DateTime?
+  passwordHash    String?
+  role            AccountRole @default(PLATFORM_USER)
+  protected       Boolean     @default(false) // 唯一超级管理员：不可删除/禁用/降级
+  status          UserStatus  @default(PENDING)
+  legacyMemberId  BigInt?     @unique // 认领绑定的旧平台成员 id（单向一次性）
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  emailCodes    EmailCode[]
+  refreshTokens RefreshToken[]
+  applications  AuditApplication[]
+  profile       MemberProfile?
+}
+
+model EmailCode {
+  id            BigInt           @id @default(autoincrement())
+  email         String
+  codeHash      String // sha256(email|code|salt)，不存明文
+  purpose       EmailCodePurpose
+  expiresAt     DateTime
+  attempts      Int              @default(0)
+  consumedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  userAccount   UserAccount?     @relation(fields: [userAccountId], references: [id])
+  userAccountId BigInt?
+
+  @@index([email, purpose, createdAt])
+}
+
+model RefreshToken {
+  id        BigInt      @id @default(autoincrement())
+  userId    BigInt
+  user      UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String      @unique // sha256 存储
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime    @default(now())
+
+  @@index([userId])
+}
+
+// ---------- 审核域 ----------
+
+model AuditApplication {
+  id                    BigInt                 @id @default(autoincrement())
+  userId                BigInt
+  user                  UserAccount            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  realName              String
+  schoolId              BigInt?
+  wechatNickname        String?
+  contact               String?
+  applyNote             String?
+  claimLegacy           Boolean                @default(false)
+  status                AuditApplicationStatus @default(PENDING)
+  matchedLegacyMemberId BigInt?
+  reviewerId            BigInt?
+  reviewRemark          String?
+  reviewedAt            DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  materials AuditMaterial[]
+
+  @@index([status, createdAt])
+}
+
+model AuditMaterial {
+  id            BigInt           @id @default(autoincrement())
+  applicationId BigInt
+  application   AuditApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kind          Int              @default(1) // 1 证明图片 2 其他附件
+  fileKey       String
+  createdAt     DateTime         @default(now())
+}
+
+model AuditLog {
+  id             BigInt      @id @default(autoincrement())
+  applicationId  BigInt?
+  operatorId     BigInt
+  action         AuditAction
+  legacyMemberId BigInt?
+  remark         String?
+  createdAt      DateTime    @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+// ---------- 业务用户域 ----------
+
+model MemberProfile {
+  id          BigInt      @id @default(autoincrement())
+  userId      BigInt      @unique
+  user        UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  realName    String?
+  schoolId    BigInt?
+  school      School?     @relation(fields: [schoolId], references: [id])
+  role        MemberRole  @default(LEADER)
+  teamId      BigInt?
+  defaultSlot Int? // 默认批阅槽位 1~10
+  uploadLimit Int         @default(100)
+  auditStatus Int         @default(0) // 0 待审核 1 已通过（对齐旧平台语义）
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  team Team? @relation(fields: [teamId], references: [id])
+}
+
+model Team {
+  id        BigInt   @id @default(autoincrement())
+  name      String?
+  leaderId  BigInt
+  createdAt DateTime @default(now())
+
+  members MemberProfile[]
+}
+
+// ---------- 主数据字典（旧库导入种子，保留旧 id） ----------
+
+model Area {
+  id   BigInt @id
+  name String
+}
+
+model School {
+  id      BigInt           @id
+  name    String
+  areaId  BigInt
+  members MemberProfile[]
+
+  @@index([areaId])
+}
+
+model Grade {
+  id   BigInt @id
+  name String
+}
+
+model Prize {
+  id   BigInt @id
+  name String
+}
+
+model Topic {
+  id   BigInt @id
+  name String
+}
+
+// ---------- 老用户认领参照快照（只读用途，来自旧库最小导入） ----------
+
+model LegacyMemberRef {
+  id             BigInt    @id
+  realName       String?
+  wechatNickname String?
+  wechatAvatar   String?
+  schoolId       BigInt?
+  auditStatus    Int?
+  roleType       Int?
+  defaultTopicId Int?
+  uploadLimit    Int?
+  createdAt      DateTime?
+
+  @@index([realName])
+  @@index([wechatNickname])
+  @@index([schoolId])
+}

@@ -1,0 +1,21 @@
+{
+  "name": "cphos-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CPHOS 联考新平台：TypeScript 全栈（Fastify + Prisma + React + Ant Design），三端界面",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "dev:db": "pnpm --filter @cphos/api dev:db",
+    "dev:api": "pnpm --filter @cphos/api dev",
+    "dev:web": "pnpm --filter @cphos/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "api:migrate": "pnpm --filter @cphos/api prisma:migrate",
+    "api:init-super-admin": "pnpm --filter @cphos/api init-super-admin",
+    "api:create-internal": "pnpm --filter @cphos/api create-internal"
+  }
+}
