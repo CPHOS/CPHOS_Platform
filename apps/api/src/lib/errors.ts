@@ -30,4 +30,12 @@ export const Errors = {
   unauthorized: () => new AppError(401, ERROR_CODES.UNAUTHORIZED, '请先登录'),
   forbidden: () => new AppError(403, ERROR_CODES.FORBIDDEN, '没有权限执行该操作'),
   notFound: (what = '资源') => new AppError(404, ERROR_CODES.NOT_FOUND, `${what}不存在`),
+  applicationExists: () =>
+    new AppError(409, ERROR_CODES.APPLICATION_EXISTS, '已有待审核申请，请勿重复提交'),
+  applicationNotEditable: () =>
+    new AppError(409, ERROR_CODES.APPLICATION_NOT_EDITABLE, '当前申请状态不可修改'),
+  alreadyReviewed: () =>
+    new AppError(409, ERROR_CODES.ALREADY_REVIEWED, '该申请已审核，不可重复操作'),
+  legacyAlreadyClaimed: () =>
+    new AppError(409, ERROR_CODES.LEGACY_ALREADY_CLAIMED, '该旧账号已被其他用户认领'),
 };

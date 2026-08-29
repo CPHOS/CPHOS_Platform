@@ -17,9 +17,9 @@ const login = async (account, password) => {
 const cases = [
   // [账号, 密码, 期望]
   ['super', 'superadmin888', { role: 'SUPER_ADMIN', protected: true, displayName: '系统管理员', email: null }],
-  ['zhangsan', 'member888', { role: 'CPHOS_MEMBER', protected: false, displayName: '张三', profile: null }],
+  ['zhangsan', '123123', { role: 'CPHOS_MEMBER', protected: false, displayName: '张三', profile: null }],
   ['lioper', 'ops888', { role: 'ADMIN', protected: false, displayName: '李四' }],
-  ['coach.test@example.com', 'secret123', { role: 'PLATFORM_USER', email: 'coach.test@example.com' }],
+  ['coach.test@example.com', '123123', { role: 'PLATFORM_USER', email: 'coach.test@example.com' }],
 ];
 
 let failed = 0;

@@ -2,7 +2,7 @@
 // 覆盖：login → 捕获 refresh cookie → refresh 轮换 → logout → 旧令牌 401
 const BASE = 'http://127.0.0.1:3001/api';
 const EMAIL = 'coach.test@example.com';
-const PASSWORD = 'secret123';
+const PASSWORD = '123123';
 
 function assert(cond, label) {
   if (!cond) throw new Error(`FAIL: ${label}`);

@@ -1,5 +1,5 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Form, Input, Typography, message } from 'antd';
+import { Button, Card, Form, Input, Typography, message } from 'antd';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiErrorMessage } from '../../api/http';
@@ -39,12 +39,6 @@ export function LoginPage() {
         <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
           教练 / 个人参赛者 / CPHOS 成员 / 管理员统一入口
         </Typography.Paragraph>
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="平台用户用邮箱登录；内部账号用用户名登录"
-        />
         <Form<FormValues> onFinish={onFinish} size="large">
           <Form.Item
             name="account"

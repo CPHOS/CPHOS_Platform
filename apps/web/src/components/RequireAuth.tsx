@@ -8,14 +8,14 @@ interface RequireAuthProps {
   children: React.ReactNode;
 }
 
-const PUBLIC_PATHS = ['/login', '/register', '/verify-email', '/pending'];
+const PUBLIC_PATHS = ['/login', '/register', '/verify-email'];
 
 /**
  * 登录与角色守卫：
  * - 会话恢复中 → 全屏加载
  * - 未登录 → /login（带回跳地址）
  * - 已登录但邮箱未验证 → /verify-email
- * - 已登录但状态待审核/禁用 → /pending
+ * - 待审核用户 → 进入其归属工作台（审核状态面板在工作台内展示）
  * - 角色与界面不匹配 → 跳转到其归属首页
  */
 export function RequireAuth({ kind, children }: RequireAuthProps) {
@@ -45,11 +45,6 @@ export function RequireAuth({ kind, children }: RequireAuthProps) {
   if (user.role === 'PLATFORM_USER' && !user.emailVerified) {
     if (location.pathname === '/verify-email') return <>{children}</>;
     return <Navigate to="/verify-email" replace />;
-  }
-
-  if (user.status === 'PENDING') {
-    if (location.pathname === '/pending') return <>{children}</>;
-    return <Navigate to="/pending" replace />;
   }
 
   const expected = homeFor(user);

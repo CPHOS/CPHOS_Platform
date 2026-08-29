@@ -16,6 +16,7 @@
     "test": "pnpm -r test",
     "api:migrate": "pnpm --filter @cphos/api prisma:migrate",
     "api:init-super-admin": "pnpm --filter @cphos/api init-super-admin",
-    "api:create-internal": "pnpm --filter @cphos/api create-internal"
+    "api:create-internal": "pnpm --filter @cphos/api create-internal",
+    "api:seed-dev": "pnpm --filter @cphos/api seed:dev"
   }
 }
