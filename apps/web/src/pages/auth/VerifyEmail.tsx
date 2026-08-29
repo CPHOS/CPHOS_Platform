@@ -23,8 +23,8 @@ export function VerifyEmailPage() {
     try {
       await authApi.verifyEmail({ email, code: values.code });
       message.success('邮箱验证成功');
-      await loadMe();
-      navigate('/pending', { replace: true });
+      const me = await loadMe();
+      navigate(me ? '/app' : '/login', { replace: true });
     } catch (err) {
       message.error(apiErrorMessage(err));
     } finally {

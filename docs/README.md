@@ -15,8 +15,8 @@
 
 | 包 | 内容 | 状态 |
 | --- | --- | --- |
-| `apps/api` | Fastify 5 + Prisma 6（PostgreSQL）：认证、审核（待实现）、业务域（待实现） | 功能块 1（认证）已完成 |
-| `apps/web` | Vite 6 + React 18 + Ant Design 5：三端界面（`/app` 平台用户、`/cphos` CPHOS 成员、`/admin` 管理员） | 功能块 1（认证+三端壳）已完成 |
+| `apps/api` | Fastify 5 + Prisma 6（PostgreSQL）：认证、审核与认领、业务域（待实现） | 功能块 1（认证）+ 2（审核与认领，核心）已完成 |
+| `apps/web` | Vite 6 + React 18 + Ant Design 5：三端界面（`/app` 平台用户、`/cphos` CPHOS 成员、`/admin` 管理员） | 功能块 1（认证+三端壳）+ 2（提交资料 + 审核工作台）已完成 |
 | `packages/shared` | 前后端共用枚举 / Zod schema / DTO | 生效 |
 
 ## 快速开始
@@ -25,9 +25,11 @@
 pnpm install
 pnpm dev:db            # 终端 1：内嵌 PostgreSQL（数据在 apps/api/.pgdata/）
 pnpm api:migrate       # 终端 2：首次迁移
+pnpm api:seed-dev      # 终端 2：开发种子（字典 + 示例认领参照，可反复执行）
 pnpm dev:api           # 终端 3：API（http://127.0.0.1:3001）
 pnpm dev:web           # 终端 4：前端（http://localhost:5173）
-pnpm api:create-admin -- admin@example.com admin888   # 引导管理员
+pnpm api:init-super-admin -- super@example.com <密码>   # 超级管理员（受保护）
+pnpm api:create-internal -- <邮箱> <密码> <姓名> ADMIN  # 管理员（审核工作台）
 ```
 
 开发模式未配置 SMTP 时，验证码写入 `apps/api/.devmail/*.json` 并在 API 日志打印。
@@ -35,14 +37,15 @@ pnpm api:create-admin -- admin@example.com admin888   # 引导管理员
 ## 开发约定
 
 - 每完成一个功能块，在会话中报告该块的设计与使用方式，与用户对齐后再进入下一块；
-- 功能块进度：① 工程骨架 + 认证（✅ 完成，见首次块报告）→ ② 审核与认领 → ③ 用户域业务 → ④ 考试域 → ⑤ 排名/导出/收尾。
+- 功能块进度：① 工程骨架 + 认证（✅）→ ② 审核与认领（✅ 核心：提交资料 / 审核工作台 / 认领匹配 / 通过建资料，材料上传暂缓）→ ③ 用户域业务 → ④ 考试域 → ⑤ 排名/导出/收尾。
 
 ## 待办（按优先级）
 
 1. **外包用户库**连接信息与结构（若含 email/mobile，认领匹配可大幅简化）；
-2. 旧库数据导入：字典种子 + 老用户认领参照快照（审核块内实现）；
-3. 审核资料强度、团队模型、认领后角色继承等设计决策（《02》Q3–Q7）；
-4. SMTP 发信配置与送达率实验（生产前）。
+2. 旧库数据导入：字典种子 + 老用户认领参照快照（迁移暂缓，开发用 `api:seed-dev` 占位）；
+3. 审核材料上传（`AuditMaterial`，含对象存储/bytea 决策，暂缓）；
+4. 团队模型、认领后角色继承等设计决策（《02》Q3、Q7）；
+5. SMTP 发信配置与送达率实验（生产前）。
 
 ## 敏感信息提示
 

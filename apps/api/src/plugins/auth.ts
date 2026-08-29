@@ -1,11 +1,18 @@
 import fp from 'fastify-plugin';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { AccountRole, UserStatus } from '@cphos/shared';
 import { Errors } from '../lib/errors.js';
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: { sub: string; email: string | null };
-    user: { sub: string; email: string | null };
+    user: {
+      sub: string;
+      email: string | null;
+      /** 授权守卫（authorize）填充，authenticate 阶段不存在 */
+      role?: AccountRole;
+      status?: UserStatus;
+    };
   }
 }
 

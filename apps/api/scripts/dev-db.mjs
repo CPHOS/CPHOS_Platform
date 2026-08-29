@@ -2,21 +2,26 @@
 // 用法：pnpm dev:db（保持运行）；连接串：
 //   postgresql://cphos:cphos@127.0.0.1:54329/cphos
 import EmbeddedPostgres from 'embedded-postgres';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = 54329;
+const databaseDir = path.join(__dirname, '..', '.pgdata');
 const pg = new EmbeddedPostgres({
-  databaseDir: path.join(__dirname, '..', '.pgdata'),
+  databaseDir,
   user: 'cphos',
   password: 'cphos',
   port: PORT,
   persistent: true,
 });
 
-await pg.initialise();
+// 首次启动初始化集群；已初始化（存在 PG_VERSION）则直接启动，支持 Ctrl+C 后重启
+if (!fs.existsSync(path.join(databaseDir, 'PG_VERSION'))) {
+  await pg.initialise();
+}
 await pg.start();
 try {
   await pg.createDatabase('cphos');
