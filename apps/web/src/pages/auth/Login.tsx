@@ -1,8 +1,9 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Typography, message } from 'antd';
+import { App, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiErrorMessage } from '../../api/http';
+import logo from '../../assets/logo.png';
 import { homeFor, useAuthStore } from '../../stores/auth';
 
 interface FormValues {
@@ -11,6 +12,7 @@ interface FormValues {
 }
 
 export function LoginPage() {
+  const { message } = App.useApp();
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,14 +33,16 @@ export function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
-      <Card style={{ width: 400 }}>
-        <Typography.Title level={4} style={{ textAlign: 'center', marginBottom: 4 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: 16 }}>
+      <Card style={{ width: '100%', maxWidth: 400 }}>
+        <img
+          src={logo}
+          alt="CPHOS"
+          style={{ height: 44, width: 'auto', display: 'block', margin: '0 auto 16px' }}
+        />
+        <Typography.Title level={4} style={{ textAlign: 'center', marginBottom: 24 }}>
           CPHOS 联考平台
         </Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
-          教练 / 个人参赛者 / CPHOS 成员 / 管理员统一入口
-        </Typography.Paragraph>
         <Form<FormValues> onFinish={onFinish} size="large">
           <Form.Item
             name="account"

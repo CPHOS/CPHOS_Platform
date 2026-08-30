@@ -1,5 +1,5 @@
 import { LockOutlined, MailOutlined, SafetyOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Form, Input, Steps, Typography, message } from 'antd';
+import { Alert, App, Button, Card, Form, Input, Steps, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
@@ -20,6 +20,7 @@ interface CodeForm {
  * 2) 输入验证码 → 验证通过后进入"待审核"页
  */
 export function RegisterPage() {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [email, setEmail] = useState('');
@@ -62,8 +63,8 @@ export function RegisterPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
-      <Card style={{ width: 440 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: 16 }}>
+      <Card style={{ width: '100%', maxWidth: 440 }}>
         <Typography.Title level={4} style={{ textAlign: 'center' }}>注册账号</Typography.Title>
         <Steps
           size="small"
