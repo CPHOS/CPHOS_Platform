@@ -1,0 +1,53 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f6f8fa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(9, 105, 218, 0.2);
+}
+
+/* 内容区：整体不滚动，仅右侧卡片区域内部滚动（滚动条固定在内容区右缘，不挤压布局） */
+.shell-scroll {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  height: 100%;
+}
+
+.shell-inner {
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .shell-inner {
+    padding: 24px;
+  }
+}
+
+/* 顶栏品牌：超长时省略号 */
+.shell-brand {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 侧栏折叠（移动端）时隐藏分组标签 */
+.ant-layout-sider-collapsed .shell-section {
+  display: none;
+}
+
+/* 小屏隐藏顶栏用户名，只留头像 */
+@media (max-width: 480px) {
+  .shell-user-name {
+    display: none;
+  }
+}

@@ -1,13 +1,21 @@
+import { AppstoreOutlined, FileExcelOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
 import { Card, Col, Result, Row, Typography } from 'antd';
+import type { ReactNode } from 'react';
 import { useAuthStore } from '../../stores/auth';
 import { ROLE_LABELS } from '@cphos/shared';
 import { ApplyStatus } from './ApplyStatus';
 
-const FEATURES = [
-  { title: '学生管理', desc: '创建与管理名下学生（毕业年份、学校、奖项）' },
-  { title: '报名与上传', desc: '选择考试批次，上传学生答题卡（逐题图片）' },
-  { title: '阅卷任务', desc: '按默认批阅槽位领取任务，双阅打分' },
-  { title: '成绩与排名', desc: '查看学生成绩与分段排名' },
+interface Feature {
+  icon: ReactNode;
+  title: string;
+  desc: string;
+}
+
+const FEATURES: Feature[] = [
+  { icon: <TeamOutlined />, title: '学生管理', desc: '创建与管理名下学生（毕业年份、学校、奖项）' },
+  { icon: <FileExcelOutlined />, title: '报名与上传', desc: '选择考试批次，上传学生答题卡（逐题图片）' },
+  { icon: <TrophyOutlined />, title: '阅卷任务', desc: '按默认批阅槽位领取任务，双阅打分' },
+  { icon: <AppstoreOutlined />, title: '成绩与排名', desc: '查看学生成绩与分段排名' },
 ];
 
 /** 平台用户（教练/个人参赛者）工作台；待审核用户在此展示审核状态面板 */
@@ -34,8 +42,20 @@ export function PlatformHome() {
       <Row gutter={[16, 16]}>
         {FEATURES.map((f) => (
           <Col key={f.title} xs={24} sm={12} lg={6}>
-            <Card title={f.title} size="small">
-              {f.desc}
+            <Card size="small" style={{ height: '100%' }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <span style={{ color: '#0969da', fontSize: 20, marginTop: 1, flexShrink: 0 }}>
+                  {f.icon}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <Typography.Text strong style={{ fontSize: 15 }}>
+                    {f.title}
+                  </Typography.Text>
+                  <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+                    {f.desc}
+                  </Typography.Paragraph>
+                </div>
+              </div>
             </Card>
           </Col>
         ))}

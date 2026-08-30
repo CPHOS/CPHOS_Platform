@@ -6,6 +6,7 @@ import {
   type ReviewDecisionInput,
 } from '@cphos/shared';
 import {
+  App,
   Button,
   Card,
   Descriptions,
@@ -18,7 +19,6 @@ import {
   Space,
   Tag,
   Typography,
-  message,
 } from 'antd';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -40,6 +40,7 @@ interface ApproveForm {
 
 /** 管理员审核详情：资料 + 认领候选 + 审核决策 */
 export function AuditDetail() {
+  const { message } = App.useApp();
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -238,6 +239,7 @@ function RejectModal({
   onSubmit: (remark: string) => void;
   onCancel: () => void;
 }) {
+  const { message } = App.useApp();
   const [remark, setRemark] = useState('');
   return (
     <Modal

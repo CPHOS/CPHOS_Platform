@@ -1,14 +1,18 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { AppstoreOutlined, AuditOutlined, HomeOutlined, IdcardOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { RequireAuth } from './components/RequireAuth';
 import { ShellLayout } from './layouts/ShellLayout';
 import { AdminHome } from './pages/admin/Home';
 import { AuditList } from './pages/admin/audit/List';
 import { AuditDetail } from './pages/admin/audit/Detail';
+import { AccountsList } from './pages/admin/accounts/List';
+import { MembersList } from './pages/admin/members/List';
 import { LoginPage } from './pages/auth/Login';
 import { RegisterPage } from './pages/auth/Register';
 import { VerifyEmailPage } from './pages/auth/VerifyEmail';
 import { CphosHome } from './pages/cphos/Home';
 import { PlatformHome } from './pages/platform/Home';
+import { ProfilePage } from './pages/Profile';
 
 /**
  * 三端路由：
@@ -36,22 +40,36 @@ export function App() {
         path="/app"
         element={
           <RequireAuth kind="platform">
-            <ShellLayout kind="platform" nav={[{ key: '/app', label: '工作台' }]} />
+            <ShellLayout
+              kind="platform"
+              nav={[
+                { key: '/app', label: '工作台', icon: <HomeOutlined /> },
+                { key: '/app/profile', label: '个人信息', icon: <IdcardOutlined /> },
+              ]}
+            />
           </RequireAuth>
         }
       >
         <Route index element={<PlatformHome />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route
         path="/cphos"
         element={
           <RequireAuth kind="cphos">
-            <ShellLayout kind="cphos" nav={[{ key: '/cphos', label: '工作台' }]} />
+            <ShellLayout
+              kind="cphos"
+              nav={[
+                { key: '/cphos', label: '工作台', icon: <HomeOutlined /> },
+                { key: '/cphos/profile', label: '个人信息', icon: <IdcardOutlined /> },
+              ]}
+            />
           </RequireAuth>
         }
       >
         <Route index element={<CphosHome />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route
@@ -61,8 +79,11 @@ export function App() {
             <ShellLayout
               kind="admin"
               nav={[
-                { key: '/admin', label: '概览' },
-                { key: '/admin/audit', label: '用户审核' },
+                { key: '/admin', label: '概览', icon: <AppstoreOutlined /> },
+                { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined /> },
+                { key: '/admin/members', label: '成员管理', icon: <TeamOutlined /> },
+                { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined /> },
+                { key: '/admin/profile', label: '个人信息', icon: <IdcardOutlined /> },
               ]}
             />
           </RequireAuth>
@@ -71,6 +92,9 @@ export function App() {
         <Route index element={<AdminHome />} />
         <Route path="audit" element={<AuditList />} />
         <Route path="audit/:id" element={<AuditDetail />} />
+        <Route path="members" element={<MembersList />} />
+        <Route path="accounts" element={<AccountsList />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/app" replace />} />
