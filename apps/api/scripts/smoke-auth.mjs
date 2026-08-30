@@ -1,9 +1,9 @@
 // 认证链路冒烟测试（Node fetch，独立于前端）
-// 前置：coach.test@example.com 已注册并完成邮箱验证（密码 12312345）。
+// 前置：coach.test@example.com 已注册并完成邮箱验证（密码 12312312）。
 // 覆盖：login → 捕获 refresh cookie → refresh 轮换 → logout → 旧令牌 401
 const BASE = 'http://127.0.0.1:3001/api';
 const EMAIL = 'coach.test@example.com';
-const PASSWORD = '12312345';
+const PASSWORD = '12312312';
 
 function assert(cond, label) {
   if (!cond) throw new Error(`FAIL: ${label}`);

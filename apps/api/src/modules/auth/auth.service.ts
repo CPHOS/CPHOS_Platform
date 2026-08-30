@@ -28,6 +28,7 @@ function toUserDto(user: UserAccount & { profile: ProfileWithSchool }): UserDto 
     protected: user.protected,
     emailVerified: user.emailVerifiedAt !== null,
     legacyMemberId: user.legacyMemberId === null ? null : String(user.legacyMemberId),
+    createdAt: user.createdAt.toISOString(),
     profile: user.profile
       ? {
           realName: user.profile.realName,

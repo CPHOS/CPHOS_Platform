@@ -12,6 +12,8 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { auditRoutes } from './modules/audit/audit.routes.js';
 import { adminAuditRoutes } from './modules/audit/audit.admin.routes.js';
 import { dictRoutes } from './modules/dict/dict.routes.js';
+import { adminMemberRoutes } from './modules/members/members.admin.routes.js';
+import { adminAccountRoutes } from './modules/members/accounts.admin.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -50,6 +52,8 @@ export async function buildApp() {
   await app.register(dictRoutes, { prefix: '/api/dict' });
   await app.register(auditRoutes, { prefix: '/api/audit' });
   await app.register(adminAuditRoutes, { prefix: '/api/admin/audit' });
+  await app.register(adminMemberRoutes, { prefix: '/api/admin' });
+  await app.register(adminAccountRoutes, { prefix: '/api/admin' });
 
   return app;
 }

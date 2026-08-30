@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const BASE = 'http://127.0.0.1:3001/api';
 const ADMIN_ACCOUNT = 'admin';
 const ADMIN_PASSWORD = 'admin888';
-const PASSWORD = '12312345';
+const PASSWORD = '12312312';
 const DEVMAIL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.devmail');
 
 function assert(cond, label) {
