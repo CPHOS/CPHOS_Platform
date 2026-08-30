@@ -4,9 +4,14 @@ import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import { env } from './env.js';
+import { ERROR_CODES } from '@cphos/shared';
 import { authPlugin } from './plugins/auth.js';
+import { authorizePlugin } from './plugins/authorize.js';
 import { installErrorHandler } from './plugins/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { auditRoutes } from './modules/audit/audit.routes.js';
+import { adminAuditRoutes } from './modules/audit/audit.admin.routes.js';
+import { dictRoutes } from './modules/dict/dict.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -31,12 +36,20 @@ export async function buildApp() {
     timeWindow: '1 minute',
   });
   await app.register(authPlugin);
+  await app.register(authorizePlugin);
 
   installErrorHandler(app);
+
+  app.setNotFoundHandler((req, reply) => {
+    reply.code(404).send({ code: ERROR_CODES.NOT_FOUND, message: '资源不存在' });
+  });
 
   app.get('/api/health', async () => ({ status: 'ok', time: new Date().toISOString() }));
 
   await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(dictRoutes, { prefix: '/api/dict' });
+  await app.register(auditRoutes, { prefix: '/api/audit' });
+  await app.register(adminAuditRoutes, { prefix: '/api/admin/audit' });
 
   return app;
 }

@@ -1,6 +1,7 @@
-import { Card, Col, Row, Typography } from 'antd';
+import { Card, Col, Result, Row, Typography } from 'antd';
 import { useAuthStore } from '../../stores/auth';
 import { ROLE_LABELS } from '@cphos/shared';
+import { ApplyStatus } from './ApplyStatus';
 
 const FEATURES = [
   { title: '学生管理', desc: '创建与管理名下学生（毕业年份、学校、奖项）' },
@@ -9,9 +10,18 @@ const FEATURES = [
   { title: '成绩与排名', desc: '查看学生成绩与分段排名' },
 ];
 
-/** 平台用户（教练/个人参赛者）首页占位 */
+/** 平台用户（教练/个人参赛者）工作台；待审核用户在此展示审核状态面板 */
 export function PlatformHome() {
   const user = useAuthStore((s) => s.user);
+
+  if (user?.status === 'DISABLED') {
+    return <Result status="error" title="账号已禁用" subTitle="如有疑问请联系管理员。" />;
+  }
+
+  if (user?.status === 'PENDING') {
+    return <ApplyStatus />;
+  }
+
   return (
     <div>
       <Typography.Title level={4}>
@@ -19,7 +29,7 @@ export function PlatformHome() {
         {user?.profile ? `（${ROLE_LABELS[user.profile.role]}）` : ''}
       </Typography.Title>
       <Typography.Paragraph type="secondary">
-        以下功能将按里程碑逐步开放，当前为平台骨架（功能块 1：认证）。
+        以下功能将按里程碑逐步开放。
       </Typography.Paragraph>
       <Row gutter={[16, 16]}>
         {FEATURES.map((f) => (

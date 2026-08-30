@@ -118,6 +118,7 @@ model AuditApplication {
   reviewerId            BigInt?
   reviewRemark          String?
   reviewedAt            DateTime?
+  materialRequestedAt   DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 

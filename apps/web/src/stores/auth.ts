@@ -20,7 +20,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   async login(account, password) {
     const { user, accessToken } = await authApi.login({ account, password });
     setAccessToken(accessToken);
-    set({ user });
+    set({ user, booting: false });
     return user;
   },
 
@@ -41,7 +41,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await authApi.logout();
     } finally {
       setAccessToken(null);
-      set({ user: null });
+      set({ user: null, booting: false });
     }
   },
 
