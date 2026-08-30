@@ -229,14 +229,11 @@ export async function matchCandidates(applicationId: bigint): Promise<LegacyMemb
   const nick = app.wechatNickname?.trim();
   if (!realName && !nick) return [];
 
-  // 转义 LIKE 通配符，避免用户输入中的 % / _ 被当作通配符
-  const escapeLike = (s: string) => s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-
   const refs = await prisma.legacyMemberRef.findMany({
     where: {
       OR: [
-        { realName: { contains: escapeLike(realName) } },
-        ...(nick ? [{ wechatNickname: { contains: escapeLike(nick) } }] : []),
+        { realName: { contains: realName } },
+        ...(nick ? [{ wechatNickname: { contains: nick } }] : []),
       ],
     },
     take: 200,
@@ -270,108 +267,122 @@ export async function review(
   reviewerId: bigint,
   decision: ReviewDecisionInput,
 ): Promise<AuditApplicationDto> {
-  await prisma.$transaction(async (tx) => {
-    const app = await tx.auditApplication.findUnique({ where: { id } });
-    if (!app) throw Errors.notFound('申请');
-    if (app.status !== 'PENDING') throw Errors.alreadyReviewed();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const app = await tx.auditApplication.findUnique({ where: { id } });
+      if (!app) throw Errors.notFound('申请');
+      if (app.status !== 'PENDING') throw Errors.alreadyReviewed();
 
-    const now = new Date();
+      const now = new Date();
 
-    if (decision.action === 'APPROVE') {
-      let legacyMemberId: bigint | null = null;
-      if (decision.legacyMemberId) {
-        legacyMemberId = BigInt(decision.legacyMemberId);
-        const claimed = await tx.userAccount.findFirst({ where: { legacyMemberId } });
-        if (claimed && claimed.id !== app.userId) throw Errors.legacyAlreadyClaimed();
-      }
-
-      const schoolId = app.schoolId;
-      const uploadLimit =
-        decision.uploadLimit ?? (schoolId === INDIVIDUAL_SCHOOL_ID ? 1 : DEFAULT_UPLOAD_LIMIT);
-
-      await tx.auditApplication.update({
-        where: { id },
-        data: {
-          status: 'APPROVED',
-          matchedLegacyMemberId: legacyMemberId,
-          reviewerId,
-          reviewRemark: decision.remark ?? null,
-          reviewedAt: now,
-          materialRequestedAt: null,
-        },
-      });
-
-      await tx.memberProfile.upsert({
-        where: { userId: app.userId },
-        create: {
-          userId: app.userId,
-          realName: app.realName,
-          schoolId,
-          role: 'LEADER',
-          defaultSlot: decision.defaultSlot ?? null,
-          uploadLimit,
-          auditStatus: 1,
-        },
-        update: {
-          realName: app.realName,
-          schoolId,
-          role: 'LEADER',
-          defaultSlot: decision.defaultSlot ?? null,
-          uploadLimit,
-          auditStatus: 1,
-        },
-      });
-
-      try {
-        await tx.userAccount.update({
-          where: { id: app.userId },
-          data: { status: 'ACTIVE', legacyMemberId: legacyMemberId ?? undefined },
-        });
-      } catch (err) {
-        // 并发下唯一约束兜底：同一旧账号被并发认领 → 409
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-          throw Errors.legacyAlreadyClaimed();
+      if (decision.action === 'APPROVE') {
+        let legacyMemberId: bigint | null = null;
+        if (decision.legacyMemberId) {
+          legacyMemberId = BigInt(decision.legacyMemberId);
+          // 校验旧账号存在于参照快照，防止绑定不存在的旧 id / 张冠李戴
+          const ref = await tx.legacyMemberRef.findUnique({ where: { id: legacyMemberId } });
+          if (!ref) throw Errors.validation('该旧账号不存在');
+          const claimed = await tx.userAccount.findFirst({ where: { legacyMemberId } });
+          if (claimed && claimed.id !== app.userId) throw Errors.legacyAlreadyClaimed();
         }
-        throw err;
-      }
 
-      await tx.auditLog.create({
-        data: { applicationId: id, operatorId: reviewerId, action: 'APPROVE', legacyMemberId, remark: decision.remark ?? null },
-      });
-      if (legacyMemberId) {
-        await tx.auditLog.create({
-          data: { applicationId: id, operatorId: reviewerId, action: 'BIND_LEGACY', legacyMemberId },
+        const schoolId = app.schoolId;
+        const uploadLimit =
+          decision.uploadLimit ?? (schoolId === INDIVIDUAL_SCHOOL_ID ? 1 : DEFAULT_UPLOAD_LIMIT);
+
+        // 原子抢占：仅首个事务能将 PENDING 流转，避免并发双重审批（updateMany 条件更新）
+        const transitioned = await tx.auditApplication.updateMany({
+          where: { id, status: 'PENDING' },
+          data: {
+            status: 'APPROVED',
+            matchedLegacyMemberId: legacyMemberId,
+            reviewerId,
+            reviewRemark: decision.remark ?? null,
+            reviewedAt: now,
+            materialRequestedAt: null,
+          },
         });
+        if (transitioned.count !== 1) throw Errors.alreadyReviewed();
+
+        await tx.memberProfile.upsert({
+          where: { userId: app.userId },
+          create: {
+            userId: app.userId,
+            realName: app.realName,
+            schoolId,
+            role: 'LEADER',
+            defaultSlot: decision.defaultSlot ?? null,
+            uploadLimit,
+            auditStatus: 1,
+          },
+          update: {
+            realName: app.realName,
+            schoolId,
+            role: 'LEADER',
+            defaultSlot: decision.defaultSlot ?? null,
+            uploadLimit,
+            auditStatus: 1,
+          },
+        });
+
+        try {
+          await tx.userAccount.update({
+            where: { id: app.userId },
+            data: { status: 'ACTIVE', legacyMemberId: legacyMemberId ?? undefined },
+          });
+        } catch (err) {
+          // 并发下唯一约束兜底：同一旧账号被并发认领 → 409
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            throw Errors.legacyAlreadyClaimed();
+          }
+          throw err;
+        }
+
+        await tx.auditLog.create({
+          data: { applicationId: id, operatorId: reviewerId, action: 'APPROVE', legacyMemberId, remark: decision.remark ?? null },
+        });
+        if (legacyMemberId) {
+          await tx.auditLog.create({
+            data: { applicationId: id, operatorId: reviewerId, action: 'BIND_LEGACY', legacyMemberId },
+          });
+        }
+        return;
       }
-      return;
-    }
 
-    if (decision.action === 'REJECT') {
-      await tx.auditApplication.update({
-        where: { id },
-        data: {
-          status: 'REJECTED',
-          reviewerId,
-          reviewRemark: decision.remark ?? null,
-          reviewedAt: now,
-          materialRequestedAt: null,
-        },
+      if (decision.action === 'REJECT') {
+        const transitioned = await tx.auditApplication.updateMany({
+          where: { id, status: 'PENDING' },
+          data: {
+            status: 'REJECTED',
+            reviewerId,
+            reviewRemark: decision.remark ?? null,
+            reviewedAt: now,
+            materialRequestedAt: null,
+          },
+        });
+        if (transitioned.count !== 1) throw Errors.alreadyReviewed();
+        await tx.auditLog.create({
+          data: { applicationId: id, operatorId: reviewerId, action: 'REJECT', remark: decision.remark ?? null },
+        });
+        return;
+      }
+
+      // REQUEST_MATERIAL：申请保持 PENDING，但记录"待补材料"状态供用户侧展示
+      const transitioned = await tx.auditApplication.updateMany({
+        where: { id, status: 'PENDING' },
+        data: { materialRequestedAt: now, reviewRemark: decision.remark ?? null, reviewerId },
       });
+      if (transitioned.count !== 1) throw Errors.alreadyReviewed();
       await tx.auditLog.create({
-        data: { applicationId: id, operatorId: reviewerId, action: 'REJECT', remark: decision.remark ?? null },
+        data: { applicationId: id, operatorId: reviewerId, action: 'REQUEST_MATERIAL', remark: decision.remark ?? null },
       });
-      return;
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw Errors.legacyAlreadyClaimed();
     }
-
-    // REQUEST_MATERIAL：申请保持 PENDING，但记录"待补材料"状态供用户侧展示
-    await tx.auditApplication.update({
-      where: { id },
-      data: { materialRequestedAt: now, reviewRemark: decision.remark ?? null, reviewerId },
-    });
-    await tx.auditLog.create({
-      data: { applicationId: id, operatorId: reviewerId, action: 'REQUEST_MATERIAL', remark: decision.remark ?? null },
-    });
-  });
+    throw err;
+  }
 
   return getApplication(id);
 }

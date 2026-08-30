@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<AuditStatus, string> = {
   REJECTED: 'error',
 };
 
-const ROLE_TYPE_LABELS: Record<number, string> = { 1: '负责人', 2: '仲裁成员', 3: '附属教练' };
+const ROLE_TYPE_LABELS: Record<number, string> = { 1: '负责人', 2: '仲裁成员（旧）', 3: '附属教练' };
 
 interface ApproveForm {
   defaultSlot?: number;
@@ -48,6 +48,7 @@ export function AuditDetail() {
   const [materialOpen, setMaterialOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [approveForm] = Form.useForm<ApproveForm>();
 
   const { data: app, isLoading } = useQuery({
     queryKey: ['admin', 'audit', 'application', id],
@@ -187,13 +188,13 @@ export function AuditDetail() {
         title="通过审核"
         open={approveOpen}
         onCancel={() => setApproveOpen(false)}
-        onOk={() => {
-          document.getElementById('approve-form-submit')?.click();
-        }}
+        onOk={() => approveForm.submit()}
         confirmLoading={submitting}
         destroyOnClose
+        afterClose={() => approveForm.resetFields()}
       >
         <Form<ApproveForm>
+          form={approveForm}
           layout="vertical"
           onFinish={(v) => doReview({ action: 'APPROVE', defaultSlot: v.defaultSlot, uploadLimit: v.uploadLimit })}
         >
@@ -203,7 +204,6 @@ export function AuditDetail() {
           <Form.Item name="uploadLimit" label="上传上限（选填，个人默认 1、其他默认 100）">
             <InputNumber min={0} max={60000} style={{ width: '100%' }} />
           </Form.Item>
-          <button type="submit" id="approve-form-submit" style={{ display: 'none' }} />
         </Form>
       </Modal>
 

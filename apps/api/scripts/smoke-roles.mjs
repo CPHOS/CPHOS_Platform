@@ -1,4 +1,9 @@
 // 角色模型冒烟测试 v2：内部账号=用户名+显示名+密码；超级管理员唯一；仲裁为模块（无 ARBITRATOR 业务角色）
+// 前置：以下账号需已存在（见下方 cases 数组）。除超管/管理员外，密码统一为 123123。
+//   创建方式：pnpm api:init-super-admin -- super 系统管理员 superadmin888
+//             pnpm api:create-internal -- zhangsan 张三 123123 CPHOS_MEMBER
+//             pnpm api:create-internal -- lioper 李四 ops888 ADMIN
+//   平台用户 coach.test@example.com 需经注册+邮箱验证流程创建（密码 123123）。
 const BASE = 'http://127.0.0.1:3001/api';
 
 const post = (path, body) =>
