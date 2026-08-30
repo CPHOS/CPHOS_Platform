@@ -23,6 +23,9 @@ export function installErrorHandler(app: FastifyInstance): void {
       // Fastify 框架错误（如 415 内容类型不支持、400 空 JSON 等）应透传状态码，避免吞成 500 掩盖真实原因
       if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
         req.log.warn({ statusCode }, '客户端请求错误');
+        if (statusCode === 401) {
+          return reply.code(401).send({ code: ERROR_CODES.UNAUTHORIZED, message: '请先登录' });
+        }
         if (statusCode === 404) {
           return reply.code(404).send({ code: ERROR_CODES.NOT_FOUND, message: '资源不存在' });
         }

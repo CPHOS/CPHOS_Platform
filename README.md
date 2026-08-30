@@ -9,14 +9,17 @@ TypeScript 全栈（pnpm monorepo）：Fastify + Prisma（PostgreSQL）后端，
 
 ## 快速开始
 
+> 环境准备：如本机直连 `registry.npmjs.org` 失败，需按 `.npmrc.example` 复制为 `.npmrc` 并配置代理（`.npmrc` 已被 gitignore，不会提交）。
+
 ```bash
 pnpm install
 
 # 终端 1：开发数据库（内嵌 PostgreSQL，数据在 apps/api/.pgdata/）
 pnpm dev:db
 
-# 终端 2：数据库迁移（首次）
+# 终端 2：数据库迁移（首次）+ 开发种子（字典 + 示例认领参照）
 pnpm api:migrate
+pnpm api:seed-dev
 
 # 终端 3：后端 API（http://127.0.0.1:3001）
 pnpm dev:api
@@ -25,9 +28,9 @@ pnpm dev:api
 pnpm dev:web
 
 # 创建系统管理员与内部账号
-pnpm api:init-super-admin -- super@example.com <密码>              # 超级管理员（受保护，不可删除）
-pnpm api:create-internal -- <邮箱> <密码> <姓名> CPHOS_MEMBER        # CPHOS 内部员工（建档即用，无需邮箱验证）
-pnpm api:create-internal -- <邮箱> <密码> <姓名> ADMIN              # 管理员（也可由超管提升）
+pnpm api:init-super-admin -- super <密码> <显示名>                  # 超级管理员（受保护，不可删除）
+pnpm api:create-internal -- <用户名> <密码> <姓名> CPHOS_MEMBER       # CPHOS 内部员工（建档即用，无需邮箱验证）
+pnpm api:create-internal -- <用户名> <密码> <姓名> ADMIN              # 管理员（也可由超管提升）
 ```
 
 开发模式未配置 SMTP 时，验证码邮件写入 `apps/api/.devmail/*.json` 并打印在 API 日志中。
