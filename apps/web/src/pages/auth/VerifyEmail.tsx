@@ -1,5 +1,5 @@
 import { SafetyOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Form, Input, Typography, message } from 'antd';
+import { Alert, App, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
@@ -12,6 +12,7 @@ interface CodeForm {
 
 /** 邮箱验证页：登录后未验证、或注册流程跳转至此 */
 export function VerifyEmailPage() {
+  const { message } = App.useApp();
   const user = useAuthStore((s) => s.user);
   const loadMe = useAuthStore((s) => s.loadMe);
   const logout = useAuthStore((s) => s.logout);
@@ -42,8 +43,8 @@ export function VerifyEmailPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
-      <Card style={{ width: 440 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: 16 }}>
+      <Card style={{ width: '100%', maxWidth: 440 }}>
         <Typography.Title level={4} style={{ textAlign: 'center' }}>邮箱验证</Typography.Title>
         <Alert type="warning" showIcon style={{ marginBottom: 16 }} message={`请完成 ${email} 的邮箱验证后继续`} />
         <Form<CodeForm> onFinish={onFinish} size="large">

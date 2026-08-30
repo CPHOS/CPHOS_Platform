@@ -16,6 +16,7 @@ export interface UserDto {
   protected: boolean;
   emailVerified: boolean;
   legacyMemberId: string | null;
+  createdAt: string;
   /** 平台用户审核通过后才有业务资料 */
   profile: {
     realName: string | null;
@@ -94,6 +95,8 @@ export interface AuditLogDto {
   operatorId: string;
   operatorName: string | null;
   legacyMemberId: string | null;
+  /** 账号管理类操作的目标账号 */
+  targetUserId: string | null;
   remark: string | null;
   createdAt: string;
 }
@@ -103,4 +106,43 @@ export interface SchoolDto {
   name: string;
   areaId: string;
   areaName: string | null;
+}
+
+// ---------- 成员与账号管理（功能块③） ----------
+
+export interface MemberDto {
+  userId: string;
+  realName: string | null;
+  schoolId: string | null;
+  schoolName: string | null;
+  role: MemberRole;
+  defaultSlot: number | null;
+  uploadLimit: number;
+  account: { email: string | null; loginName: string | null; status: UserStatus };
+}
+
+export interface MemberListDto {
+  items: MemberDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AccountDto {
+  id: string;
+  email: string | null;
+  loginName: string | null;
+  displayName: string | null;
+  role: AccountRole;
+  status: UserStatus;
+  protected: boolean;
+  createdAt: string;
+  profile: { realName: string | null; schoolName: string | null; role: MemberRole } | null;
+}
+
+export interface AccountListDto {
+  items: AccountDto[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

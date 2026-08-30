@@ -45,6 +45,10 @@ enum AuditAction {
   BIND_LEGACY // 认领绑定旧账号
   REQUEST_MATERIAL // 要求补材料
   UNBIND // 解绑/回退
+  CREATE_ACCOUNT // 创建内部账号
+  ROLE_CHANGE // 账号层级变更（提升/降级）
+  STATUS_CHANGE // 账号状态变更（启用/禁用）
+  MEMBER_UPDATE // 成员资料修改
 }
 
 enum MemberRole {
@@ -142,10 +146,12 @@ model AuditLog {
   operatorId     BigInt
   action         AuditAction
   legacyMemberId BigInt?
+  targetUserId   BigInt? // 账号管理类操作的目标账号
   remark         String?
   createdAt      DateTime    @default(now())
 
   @@index([applicationId, createdAt])
+  @@index([targetUserId, createdAt])
 }
 
 // ---------- 业务用户域 ----------

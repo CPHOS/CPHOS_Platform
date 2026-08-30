@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { AUDIT_STATUSES, EMAIL_CODE_PURPOSES } from './enums.js';
+import {
+  ACCOUNT_ROLES,
+  AUDIT_STATUSES,
+  EMAIL_CODE_PURPOSES,
+  MEMBER_ROLES,
+  USER_STATUSES,
+} from './enums.js';
 
 /** 邮箱：trim + 小写规范后校验 */
 export const emailSchema = z
@@ -74,3 +80,58 @@ export const listApplicationsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListApplicationsQuery = z.infer<typeof listApplicationsQuerySchema>;
+
+// ---------- 成员与账号管理（功能块③） ----------
+
+/** 创建内部账号（CPHOS_MEMBER，用户名+显示名+密码，不依赖邮箱） */
+export const createInternalSchema = z.object({
+  loginName: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, '请输入用户名')
+    .max(50, '用户名过长')
+    .regex(/^[a-z0-9._-]+$/, '用户名只能包含小写字母、数字和 . _ -'),
+  displayName: z.string().trim().min(1, '请输入显示名称').max(50, '显示名称过长'),
+  password: passwordSchema,
+});
+export type CreateInternalInput = z.infer<typeof createInternalSchema>;
+
+/** 账号层级变更（仅超管：提升/降级 ADMIN） */
+export const setAccountRoleSchema = z.object({
+  role: z.enum(['ADMIN', 'CPHOS_MEMBER']),
+});
+export type SetAccountRoleInput = z.infer<typeof setAccountRoleSchema>;
+
+/** 账号状态变更（启用/禁用） */
+export const setAccountStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'DISABLED']),
+});
+export type SetAccountStatusInput = z.infer<typeof setAccountStatusSchema>;
+
+/** 成员资料更新 */
+export const updateMemberSchema = z.object({
+  realName: z.string().trim().min(1, '请输入真实姓名').max(50, '姓名过长').optional(),
+  schoolId: idSchema.nullable().optional(),
+  role: z.enum(MEMBER_ROLES).optional(),
+  defaultSlot: z.number().int().min(1).max(10).nullable().optional(),
+  uploadLimit: z.number().int().min(0).max(60000).optional(),
+});
+export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
+
+export const listMembersQuerySchema = z.object({
+  role: z.enum(MEMBER_ROLES).optional(),
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListMembersQuery = z.infer<typeof listMembersQuerySchema>;
+
+export const listAccountsQuerySchema = z.object({
+  role: z.enum(ACCOUNT_ROLES).optional(),
+  status: z.enum(USER_STATUSES).optional(),
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListAccountsQuery = z.infer<typeof listAccountsQuerySchema>;

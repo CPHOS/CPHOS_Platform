@@ -27,22 +27,28 @@ export function AuditList() {
   });
 
   const columns: ColumnsType<AuditApplicationDto> = [
-    { title: '姓名', dataIndex: 'realName' },
-    { title: '微信昵称', dataIndex: 'wechatNickname' },
-    { title: '学校', dataIndex: 'schoolName', render: (v: string | null) => v ?? '-' },
-    { title: '联系方式', dataIndex: 'contact', render: (v: string | null) => v ?? '-' },
-    { title: '邮箱', render: (_, r) => r.user.email ?? '-' },
+    { title: '姓名', dataIndex: 'realName', ellipsis: true },
+    { title: '微信昵称', dataIndex: 'wechatNickname', responsive: ['md'], ellipsis: true },
+    { title: '学校', dataIndex: 'schoolName', render: (v: string | null) => v ?? '-', responsive: ['md'], ellipsis: true },
+    { title: '联系方式', dataIndex: 'contact', render: (v: string | null) => v ?? '-', responsive: ['lg'] },
+    { title: '邮箱', render: (_, r) => r.user.email ?? '-', responsive: ['lg'], ellipsis: true },
     {
       title: '认领',
       dataIndex: 'claimLegacy',
       render: (v: boolean) => (v ? <Tag color="purple">老用户</Tag> : '-'),
+      responsive: ['md'],
     },
     {
       title: '状态',
       dataIndex: 'status',
       render: (v: AuditStatus) => <Tag color={STATUS_COLORS[v]}>{AUDIT_STATUS_LABELS[v]}</Tag>,
     },
-    { title: '提交时间', dataIndex: 'createdAt', render: (v: string) => new Date(v).toLocaleString() },
+    {
+      title: '提交时间',
+      dataIndex: 'createdAt',
+      render: (v: string) => new Date(v).toLocaleString(),
+      responsive: ['sm'],
+    },
     {
       title: '操作',
       render: (_, r) => (
@@ -52,8 +58,8 @@ export function AuditList() {
   ];
 
   return (
-    <Card title="用户审核">
-      <Space style={{ marginBottom: 16 }}>
+    <Card>
+      <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
           placeholder="状态"
@@ -71,7 +77,7 @@ export function AuditList() {
         <Input.Search
           allowClear
           placeholder="姓名 / 昵称 / 联系方式 / 邮箱"
-          style={{ width: 280 }}
+          style={{ width: 280, maxWidth: '100%' }}
           onSearch={(v) => {
             setQ(v);
             setPage(1);
@@ -83,6 +89,7 @@ export function AuditList() {
         loading={isLoading}
         columns={columns}
         dataSource={data?.items ?? []}
+        tableLayout="fixed"
         pagination={{
           current: page,
           pageSize,

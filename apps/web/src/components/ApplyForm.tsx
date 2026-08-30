@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { SubmitApplicationInput } from '@cphos/shared';
-import { Button, Form, Input, Select, Switch, message } from 'antd';
+import { App, Button, Form, Input, Select, Switch } from 'antd';
 import { useState } from 'react';
 import { auditApi } from '../api/audit';
 import { dictApi } from '../api/dict';
@@ -16,6 +16,7 @@ interface ApplyFormProps {
 
 /** 提交/重提审核资料表单（学校下拉来自字典） */
 export function ApplyForm({ mode, initialValues, onDone }: ApplyFormProps) {
+  const { message } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
   const { data: schools = [] } = useQuery({ queryKey: ['dict', 'schools'], queryFn: dictApi.schools });
 
