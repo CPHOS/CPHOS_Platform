@@ -95,6 +95,8 @@ export interface AuditLogDto {
   operatorId: string;
   operatorName: string | null;
   legacyMemberId: string | null;
+  /** 账号管理类操作的目标账号 */
+  targetUserId: string | null;
   remark: string | null;
   createdAt: string;
 }

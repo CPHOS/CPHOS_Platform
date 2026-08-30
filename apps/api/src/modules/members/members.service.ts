@@ -8,7 +8,8 @@ import type {
   MemberListDto,
   UpdateMemberInput,
 } from '@cphos/shared';
-import type { MemberProfile, Prisma, School, UserAccount, UserStatus } from '@prisma/client';
+import type { MemberProfile, School, UserAccount, UserStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { Errors } from '../../lib/errors.js';
 import { hashPassword } from '../../lib/password.js';
@@ -106,9 +107,18 @@ async function countIncompleteTasks(_userId: bigint): Promise<number> {
   return 0;
 }
 
-export async function updateMember(userId: bigint, input: UpdateMemberInput): Promise<MemberDto> {
+export async function updateMember(
+  userId: bigint,
+  operatorId: bigint,
+  input: UpdateMemberInput,
+): Promise<MemberDto> {
   const current = await prisma.memberProfile.findUnique({ where: { userId } });
   if (!current) throw Errors.notFound('成员');
+
+  // TODO(Q3 团队模型)：TEAM 定案前暂不支持附属教练，避免产生无归属的 COACH
+  if (input.role === 'COACH') {
+    throw Errors.validation('附属教练需绑定团队，团队功能尚未上线，暂不支持');
+  }
 
   if (input.role && input.role !== current.role) {
     const incomplete = await countIncompleteTasks(userId);
@@ -116,6 +126,13 @@ export async function updateMember(userId: bigint, input: UpdateMemberInput): Pr
       throw Errors.validation('该成员尚有未完成的阅卷任务，暂不能切换角色');
     }
   }
+
+  const changes: string[] = [];
+  if (input.realName !== undefined) changes.push(`姓名=${input.realName}`);
+  if (input.schoolId !== undefined) changes.push(`学校=${input.schoolId ?? '空'}`);
+  if (input.role !== undefined) changes.push(`角色=${input.role}`);
+  if (input.defaultSlot !== undefined) changes.push(`槽位=${input.defaultSlot ?? '空'}`);
+  if (input.uploadLimit !== undefined) changes.push(`限额=${input.uploadLimit}`);
 
   const updated = await prisma.memberProfile.update({
     where: { userId },
@@ -129,6 +146,15 @@ export async function updateMember(userId: bigint, input: UpdateMemberInput): Pr
       ...(input.uploadLimit !== undefined ? { uploadLimit: input.uploadLimit } : {}),
     },
     include: MEMBER_INCLUDE,
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      operatorId,
+      action: 'MEMBER_UPDATE',
+      targetUserId: userId,
+      remark: changes.length ? changes.join('；') : null,
+    },
   });
   return toMemberDto(updated);
 }
@@ -164,20 +190,41 @@ export async function listAccounts(query: ListAccountsQuery): Promise<AccountLis
   return { items: rows.map(toAccountDto), total, page, pageSize };
 }
 
-export async function createInternalAccount(input: CreateInternalInput): Promise<AccountDto> {
+export async function createInternalAccount(
+  input: CreateInternalInput,
+  operatorId: bigint,
+): Promise<AccountDto> {
   const loginName = input.loginName.trim().toLowerCase();
   const existing = await prisma.userAccount.findUnique({ where: { loginName } });
   if (existing) throw Errors.validation('该用户名已存在');
 
-  const account = await prisma.userAccount.create({
+  let account: AccountWithProfile;
+  try {
+    account = await prisma.userAccount.create({
+      data: {
+        loginName,
+        displayName: input.displayName,
+        passwordHash: await hashPassword(input.password),
+        role: 'CPHOS_MEMBER',
+        status: 'ACTIVE',
+      },
+      include: ACCOUNT_INCLUDE,
+    });
+  } catch (err) {
+    // 并发创建同名账号时唯一索引兜底 → 400
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw Errors.validation('该用户名已存在');
+    }
+    throw err;
+  }
+
+  await prisma.auditLog.create({
     data: {
-      loginName,
-      displayName: input.displayName,
-      passwordHash: await hashPassword(input.password),
-      role: 'CPHOS_MEMBER',
-      status: 'ACTIVE',
+      operatorId,
+      action: 'CREATE_ACCOUNT',
+      targetUserId: account.id,
+      remark: `创建内部账号 ${loginName}（${input.displayName}）`,
     },
-    include: ACCOUNT_INCLUDE,
   });
   return toAccountDto(account);
 }
@@ -185,6 +232,7 @@ export async function createInternalAccount(input: CreateInternalInput): Promise
 export async function setAccountRole(
   id: bigint,
   role: 'ADMIN' | 'CPHOS_MEMBER',
+  operatorId: bigint,
 ): Promise<AccountDto> {
   const target = await prisma.userAccount.findUnique({ where: { id } });
   if (!target) throw Errors.notFound('账号');
@@ -201,6 +249,15 @@ export async function setAccountRole(
     data: { role },
     include: ACCOUNT_INCLUDE,
   });
+
+  await prisma.auditLog.create({
+    data: {
+      operatorId,
+      action: 'ROLE_CHANGE',
+      targetUserId: id,
+      remark: `${target.role} → ${role}`,
+    },
+  });
   return toAccountDto(account);
 }
 
@@ -216,10 +273,25 @@ export async function setAccountStatus(
     throw Errors.validation('不能禁用自己的账号');
   }
 
+  // 权限边界：ADMIN 层级账号的状态仅超级管理员可变更；普通 ADMIN 只管理成员/平台用户
+  if (target.role === 'ADMIN') {
+    const operator = await prisma.userAccount.findUnique({ where: { id: operatorId } });
+    if (!operator || operator.role !== 'SUPER_ADMIN') throw Errors.forbidden();
+  }
+
   const account = await prisma.userAccount.update({
     where: { id },
     data: { status },
     include: ACCOUNT_INCLUDE,
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      operatorId,
+      action: 'STATUS_CHANGE',
+      targetUserId: id,
+      remark: status === 'ACTIVE' ? '启用' : '禁用',
+    },
   });
   return toAccountDto(account);
 }

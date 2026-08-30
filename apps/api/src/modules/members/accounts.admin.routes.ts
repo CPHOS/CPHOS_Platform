@@ -25,14 +25,14 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/accounts', { onRequest: adminGuard }, async (req, reply) => {
     const input = createInternalSchema.parse(req.body);
-    const result = await createInternalAccount(input);
+    const result = await createInternalAccount(input, BigInt(req.user.sub));
     return reply.code(201).send(result);
   });
 
   app.post('/accounts/:id/role', { onRequest: superGuard }, async (req) => {
     const { id } = req.params as { id: string };
     const input = setAccountRoleSchema.parse(req.body);
-    return setAccountRole(BigInt(idSchema.parse(id)), input.role);
+    return setAccountRole(BigInt(idSchema.parse(id)), input.role, BigInt(req.user.sub));
   });
 
   app.post('/accounts/:id/status', { onRequest: adminGuard }, async (req) => {

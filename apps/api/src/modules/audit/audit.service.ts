@@ -425,6 +425,7 @@ export async function listLogs(options: {
     operatorId: String(r.operatorId),
     operatorName: nameMap.get(String(r.operatorId)) ?? null,
     legacyMemberId: r.legacyMemberId === null ? null : String(r.legacyMemberId),
+    targetUserId: r.targetUserId === null ? null : String(r.targetUserId),
     remark: r.remark,
     createdAt: r.createdAt.toISOString(),
   }));
