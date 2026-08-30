@@ -32,6 +32,12 @@ export const ACCOUNT_ROLE_LABELS: Record<AccountRole, string> = {
 export const AUDIT_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
 export type AuditStatus = (typeof AUDIT_STATUSES)[number];
 
+export const AUDIT_STATUS_LABELS: Record<AuditStatus, string> = {
+  PENDING: '待审核',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+};
+
 export const ROLE_LABELS: Record<MemberRole, string> = {
   LEADER: '负责人',
   COACH: '附属教练',
@@ -58,5 +64,9 @@ export const ERROR_CODES = {
   FORBIDDEN: 'FORBIDDEN',
   NOT_FOUND: 'NOT_FOUND',
   INTERNAL: 'INTERNAL',
+  APPLICATION_EXISTS: 'APPLICATION_EXISTS',
+  APPLICATION_NOT_EDITABLE: 'APPLICATION_NOT_EDITABLE',
+  ALREADY_REVIEWED: 'ALREADY_REVIEWED',
+  LEGACY_ALREADY_CLAIMED: 'LEGACY_ALREADY_CLAIMED',
 } as const;
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

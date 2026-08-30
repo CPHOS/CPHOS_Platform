@@ -9,6 +9,8 @@ declare global {
 export const prisma =
   globalThis.__cphosPrisma ??
   new PrismaClient({
+    // 显式传入连接串：env.DATABASE_URL 有默认值（内嵌 PG），确保 Prisma 读取到
+    datasourceUrl: env.DATABASE_URL,
     log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 

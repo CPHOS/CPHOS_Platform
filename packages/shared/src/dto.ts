@@ -1,4 +1,4 @@
-import type { AccountRole, MemberRole, UserStatus } from './enums.js';
+import type { AccountRole, AuditStatus, MemberRole, UserStatus } from './enums.js';
 
 /** 当前登录用户（/api/auth/me 返回，BigInt 序列化为字符串） */
 export interface UserDto {
@@ -39,4 +39,68 @@ export interface ApiErrorBody {
 
 export interface MessageResponse {
   message: string;
+}
+
+// ---------- 审核与认领 ----------
+
+export interface AuditApplicationDto {
+  id: string;
+  status: AuditStatus;
+  realName: string;
+  schoolId: string | null;
+  schoolName: string | null;
+  wechatNickname: string | null;
+  contact: string | null;
+  applyNote: string | null;
+  claimLegacy: boolean;
+  matchedLegacyMemberId: string | null;
+  reviewRemark: string | null;
+  reviewedAt: string | null;
+  /** 管理员要求补材料的时刻（非空表示待补材料，用户需修改资料后重提） */
+  materialRequestedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** 申请归属用户（平台用户=邮箱） */
+  user: { id: string; email: string | null; loginName: string | null };
+}
+
+export interface AuditApplicationListDto {
+  items: AuditApplicationDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** 老用户认领候选（来自 LegacyMemberRef 快照，无数据时为空数组） */
+export interface LegacyMemberCandidateDto {
+  id: string;
+  realName: string | null;
+  wechatNickname: string | null;
+  wechatAvatar: string | null;
+  schoolId: string | null;
+  schoolName: string | null;
+  auditStatus: number | null;
+  roleType: number | null;
+  defaultTopicId: number | null;
+  uploadLimit: number | null;
+  /** 匹配得分（前端仅展示排序，不依赖） */
+  score: number;
+}
+
+export interface AuditLogDto {
+  id: string;
+  applicationId: string | null;
+  action: string;
+  operatorId: string;
+  operatorName: string | null;
+  legacyMemberId: string | null;
+  remark: string | null;
+  createdAt: string;
+}
+
+export interface SchoolDto {
+  id: string;
+  name: string;
+  areaId: string;
+  areaName: string | null;
 }

@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "init-super-admin": "tsx scripts/init-super-admin.ts",
-    "create-internal": "tsx scripts/create-internal.ts"
+    "create-internal": "tsx scripts/create-internal.ts",
+    "seed:dev": "tsx scripts/seed-dev.ts"
   },
   "dependencies": {
     "@cphos/shared": "workspace:*",

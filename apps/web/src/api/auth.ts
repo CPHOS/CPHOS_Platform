@@ -14,7 +14,7 @@ export const authApi = {
   login: (input: { account: string; password: string }) =>
     http.post<AuthResponse>('/auth/login', input, { withCredentials: true }).then((r) => r.data),
 
-  logout: () => http.post<MessageResponse>('/auth/logout', null, { withCredentials: true }),
+  logout: () => http.post<MessageResponse>('/auth/logout', {}, { withCredentials: true }),
 
   me: () => http.get<UserDto>('/auth/me').then((r) => r.data),
 };

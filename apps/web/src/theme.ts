@@ -7,7 +7,7 @@ export const SHELL_THEMES = {
     colorPrimary: '#1677ff',
   },
   cphos: {
-    brand: 'CPHO-S 工作台',
+    brand: 'CPHOS 工作台',
     colorPrimary: '#722ed1',
   },
   admin: {

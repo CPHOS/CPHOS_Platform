@@ -22,7 +22,7 @@ let refreshing: Promise<string> | null = null;
 async function refreshAccessToken(): Promise<string> {
   if (!refreshing) {
     refreshing = axios
-      .post<AuthResponse>('/api/auth/refresh', null, { withCredentials: true })
+      .post<AuthResponse>('/api/auth/refresh', {}, { withCredentials: true })
       .then((r) => {
         setAccessToken(r.data.accessToken);
         return r.data.accessToken;
