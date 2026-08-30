@@ -10,7 +10,7 @@ const FEATURES = [
 export function CphosHome() {
   return (
     <div>
-      <Typography.Title level={4}>CPHO-S 工作台</Typography.Title>
+      <Typography.Title level={4}>CPHOS 工作台</Typography.Title>
       <Typography.Paragraph type="secondary">
         仲裁与内部阅卷功能将在考试域里程碑（M2）上线。
       </Typography.Paragraph>
