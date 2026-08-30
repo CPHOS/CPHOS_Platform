@@ -170,7 +170,8 @@ export function MembersList() {
             />
           </Form.Item>
           <Form.Item name="role" label="业务角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select options={(['LEADER', 'COACH'] as const).map((r) => ({ value: r, label: ROLE_LABELS[r] }))} />
+            {/* TODO(Q3 团队模型)：定案前暂不提供附属教练（COACH 需团队绑定） */}
+            <Select options={[{ value: 'LEADER', label: ROLE_LABELS.LEADER }]} />
           </Form.Item>
           <Form.Item name="defaultSlot" label="默认批阅槽位（1-10，可留空）">
             <InputNumber min={1} max={10} style={{ width: '100%' }} />

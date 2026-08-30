@@ -19,6 +19,6 @@ export async function adminMemberRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/members/:userId', { onRequest: guard }, async (req) => {
     const { userId } = req.params as { userId: string };
     const input = updateMemberSchema.parse(req.body);
-    return updateMember(BigInt(idSchema.parse(userId)), input);
+    return updateMember(BigInt(idSchema.parse(userId)), BigInt(req.user.sub), input);
   });
 }
