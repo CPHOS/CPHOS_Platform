@@ -12,6 +12,8 @@ export const E2E_ACCOUNTS = {
   coach: { email: 'e2e.coach@example.com', displayName: 'E2E 教练甲', password: 'E2eCoach123!' },
   coach2: { email: 'e2e.coach2@example.com', displayName: 'E2E 教练乙', password: 'E2eCoach123!' },
   rankCoach: { email: 'e2e.rank.coach@example.com', displayName: 'E2E 排名教练', password: 'E2eRankCoach123!' },
+  rankCoach2: { email: 'e2e.rank.coach2@example.com', displayName: 'E2E 排名教练乙', password: 'E2eRankCoach123!' },
+  rankCoach3: { email: 'e2e.rank.coach3@example.com', displayName: 'E2E 排名教练丙', password: 'E2eRankCoach123!' },
   reset: { email: 'e2e.reset@example.com', displayName: 'E2E 重置用户', password: 'E2eReset123!' },
   email: { email: 'e2e.email@example.com', displayName: 'E2E 换绑用户', password: 'E2eEmail123!' },
 } as const;
@@ -34,6 +36,11 @@ async function main() {
   const school = await prisma.school.upsert({
     where: { name_areaId: { name: 'E2E测试中学', areaId: area.id } },
     create: { name: 'E2E测试中学', areaId: area.id },
+    update: {},
+  });
+  const personalSchool = await prisma.school.upsert({
+    where: { name_areaId: { name: '个人', areaId: area.id } },
+    create: { name: '个人', areaId: area.id },
     update: {},
   });
 
@@ -64,6 +71,29 @@ async function main() {
       passwordHash: await hashPassword(E2E_ACCOUNTS.member.password),
       role: 'CPHOS_MEMBER',
       status: 'ACTIVE',
+    },
+  });
+
+  // 个人参赛者：即使有槽位也必须被排除在分配池外
+  const personal = await prisma.userAccount.create({
+    data: {
+      email: 'e2e.personal@example.com',
+      displayName: 'E2E 个人参赛者',
+      emailVerifiedAt: new Date(),
+      passwordHash: await hashPassword('E2ePersonal123!'),
+      role: 'PLATFORM_USER',
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.memberProfile.create({
+    data: {
+      userId: personal.id,
+      realName: '个人参赛者',
+      schoolId: personalSchool.id,
+      role: 'LEADER',
+      defaultSlot: 1,
+      uploadLimit: 100,
+      auditStatus: 1,
     },
   });
 
@@ -134,6 +164,33 @@ async function main() {
       auditStatus: 1,
     },
   });
+
+  for (const [u, slot] of [
+    [E2E_ACCOUNTS.rankCoach2, 1],
+    [E2E_ACCOUNTS.rankCoach3, 2],
+  ] as const) {
+    const account = await prisma.userAccount.create({
+      data: {
+        email: u.email,
+        displayName: u.displayName,
+        emailVerifiedAt: new Date(),
+        passwordHash: await hashPassword(u.password),
+        role: 'PLATFORM_USER',
+        status: 'ACTIVE',
+      },
+    });
+    await prisma.memberProfile.create({
+      data: {
+        userId: account.id,
+        realName: u.displayName,
+        schoolId: school.id,
+        role: 'LEADER',
+        defaultSlot: slot,
+        uploadLimit: 100,
+        auditStatus: 1,
+      },
+    });
+  }
 
   // 账号安全测试专用平台用户（已验证、正常）
   for (const u of [E2E_ACCOUNTS.reset, E2E_ACCOUNTS.email]) {

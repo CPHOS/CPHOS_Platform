@@ -68,6 +68,7 @@ enum AuditAction {
   PAPER_QUESTION_BIND // 绑定/调整题目图片
   PAPER_READY // 整卷标记完成
   PAPER_ARCHIVE // 归档整卷
+  PAPER_REVIEW_COUNT // 调整整卷评阅次数
   ALLOCATION_CREATE // 创建分配批次
   ALLOCATION_REVOKE // 撤销分配批次
   BOT_CREATE // 创建机器人账号
@@ -280,6 +281,8 @@ model ExamConfig {
   exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
   // 不再区分理论/实验：一场考试只有槽位/题目对象数量
   slotCount    Int      @default(8)
+  // 每题默认评阅次数（普通管理员不得低于 2，超管可下调）
+  reviewCount  Int      @default(2)
   defaultPoint Decimal  @default(0) @db.Decimal(8, 2)
   gap          Decimal  @default(0) @db.Decimal(8, 2)
   // 槽位/页面标题/题号/每题分值映射；理论/实验可通过两场考试分别发布
@@ -352,6 +355,8 @@ model Paper {
   uploadedById BigInt
   uploadedBy   MemberProfile @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   status       PaperStatus @default(UPLOADING)
+  // 逐卷覆盖评阅次数；null=继承考试 reviewCount
+  requiredReviewCount Int?
   score        Decimal?    @db.Decimal(10, 2)
   finalizedAt  DateTime?
   createdAt    DateTime    @default(now())

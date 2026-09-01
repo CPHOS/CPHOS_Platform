@@ -93,7 +93,7 @@ async function recomputePaper(tx: Prisma.TransactionClient, paperId: bigint): Pr
 export async function previewAllocation(examId: bigint): Promise<AllocationPreviewDto> {
   const exam = await prisma.exam.findUnique({
     where: { id: examId },
-    select: { id: true, name: true, status: true },
+    include: { config: { select: { reviewCount: true } } },
   });
   if (!exam) throw Errors.notFound('考试');
   if (exam.status !== 'PUBLISHED') throw Errors.validation('仅已发布考试可分配');
@@ -106,13 +106,24 @@ export async function previewAllocation(examId: bigint): Promise<AllocationPrevi
   const questions = paperIds.length
     ? await prisma.paperQuestion.findMany({
         where: { paperId: { in: paperIds } },
-        select: { slot: true },
+        select: { slot: true, paper: { select: { requiredReviewCount: true } } },
       })
     : [];
+  const defaultReviewCount = exam.config?.reviewCount ?? 2;
+  const reviewOf = (q: (typeof questions)[number]) => q.paper.requiredReviewCount ?? defaultReviewCount;
 
-  const slotCounts = new Map<number, number>();
-  for (const q of questions) slotCounts.set(q.slot, (slotCounts.get(q.slot) ?? 0) + 1);
-  const slots = [...slotCounts.keys()].sort((a, b) => a - b);
+  const slotQuestionCounts = new Map<number, number>();
+  const slotTaskCounts = new Map<number, number>();
+  const slotRequired = new Map<number, number>();
+  let totalTasks = 0;
+  for (const q of questions) {
+    const n = reviewOf(q);
+    slotQuestionCounts.set(q.slot, (slotQuestionCounts.get(q.slot) ?? 0) + 1);
+    slotTaskCounts.set(q.slot, (slotTaskCounts.get(q.slot) ?? 0) + n);
+    slotRequired.set(q.slot, Math.max(slotRequired.get(q.slot) ?? 0, n));
+    totalTasks += n;
+  }
+  const slots = [...slotQuestionCounts.keys()].sort((a, b) => a - b);
 
   const examiners = slots.length
     ? await prisma.memberProfile.findMany({
@@ -120,6 +131,8 @@ export async function previewAllocation(examId: bigint): Promise<AllocationPrevi
           defaultSlot: { in: slots },
           auditStatus: 1,
           user: { status: 'ACTIVE' },
+          // 个人参赛者不参与阅卷分配
+          school: { name: { not: '个人' } },
         },
         select: { id: true, defaultSlot: true },
       })
@@ -132,15 +145,17 @@ export async function previewAllocation(examId: bigint): Promise<AllocationPrevi
 
   const unassignedSlots: number[] = [];
   const slotDtos = slots.map((slot) => {
-    const questionCount = slotCounts.get(slot) ?? 0;
-    const taskCount = questionCount * 2;
+    const questionCount = slotQuestionCounts.get(slot) ?? 0;
+    const taskCount = slotTaskCounts.get(slot) ?? 0;
     const examinerCount = examinerCounts.get(slot) ?? 0;
-    if (examinerCount === 0) unassignedSlots.push(slot);
+    const requiredReviewers = slotRequired.get(slot) ?? 2;
+    if (examinerCount < requiredReviewers) unassignedSlots.push(slot);
     return {
       slot,
       questionCount,
       taskCount,
       examinerCount,
+      requiredReviewers,
       minTasks: examinerCount ? Math.floor(taskCount / examinerCount) : 0,
       maxTasks: examinerCount ? Math.ceil(taskCount / examinerCount) : 0,
     };
@@ -151,7 +166,7 @@ export async function previewAllocation(examId: bigint): Promise<AllocationPrevi
     examName: exam.name,
     readyPaperCount: papers.length,
     questionCount: questions.length,
-    taskCount: questions.length * 2,
+    taskCount: totalTasks,
     slots: slotDtos,
     unassignedSlots,
   };
@@ -164,10 +179,14 @@ export async function createAllocation(
 ): Promise<AllocationBatchDto> {
   const batch = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
-    const freshExam = await tx.exam.findUnique({ where: { id: examId }, select: { status: true } });
+    const freshExam = await tx.exam.findUnique({
+      where: { id: examId },
+      select: { status: true, config: { select: { reviewCount: true } } },
+    });
     if (!freshExam || freshExam.status !== 'PUBLISHED') {
       throw Errors.validation('考试已非进行中状态，不能分配');
     }
+    const defaultReviewCount = freshExam.config?.reviewCount ?? 2;
     const active = await tx.allocationBatch.findFirst({ where: { examId, status: 'ACTIVE' } });
     if (active) throw Errors.validation('该考试已有生效中的分配批次');
 
@@ -181,8 +200,13 @@ export async function createAllocation(
     const questions = await tx.paperQuestion.findMany({
       where: { paperId: { in: paperIds } },
       orderBy: { id: 'asc' },
-      select: { id: true, slot: true },
+      select: {
+        id: true,
+        slot: true,
+        paper: { select: { requiredReviewCount: true } },
+      },
     });
+    const reviewOf = (q: (typeof questions)[number]) => q.paper.requiredReviewCount ?? defaultReviewCount;
     if (questions.length === 0) throw Errors.validation('没有已就绪的整卷题目可分配');
     const slots = [...new Set(questions.map((q) => q.slot))].sort((a, b) => a - b);
     const examiners = await tx.memberProfile.findMany({
@@ -190,46 +214,57 @@ export async function createAllocation(
         defaultSlot: { in: slots },
         auditStatus: 1,
         user: { status: 'ACTIVE' },
+        // 个人参赛者不参与阅卷分配
+        school: { name: { not: '个人' } },
       },
       orderBy: { id: 'asc' },
       select: { id: true, defaultSlot: true },
     });
-    const examinerCounts = new Map<number, number>();
     const bySlot = new Map<number, bigint[]>();
+    const requiredBySlot = new Map<number, number>();
     for (const e of examiners) {
       if (e.defaultSlot === null) continue;
-      examinerCounts.set(e.defaultSlot, (examinerCounts.get(e.defaultSlot) ?? 0) + 1);
       const list = bySlot.get(e.defaultSlot) ?? [];
       list.push(e.id);
       bySlot.set(e.defaultSlot, list);
     }
-    const unassignedSlots = slots.filter((slot) => (examinerCounts.get(slot) ?? 0) === 0);
+    for (const q of questions) {
+      requiredBySlot.set(q.slot, Math.max(requiredBySlot.get(q.slot) ?? 0, reviewOf(q)));
+    }
+    const unassignedSlots = slots.filter(
+      (slot) => (bySlot.get(slot)?.length ?? 0) < (requiredBySlot.get(slot) ?? defaultReviewCount),
+    );
     if (unassignedSlots.length > 0) {
-      throw Errors.validation('以下槽位没有可用阅卷成员：' + unassignedSlots.join(', '));
+      throw Errors.validation(
+        '以下槽位阅卷人数不足（需至少 ' +
+          [...requiredBySlot.values()].sort((a, b) => a - b).join('/') +
+          ' 人）：' +
+          unassignedSlots.join(', '),
+      );
     }
 
     const load = new Map<string, number>();
     const loadKey = (slot: number, id: bigint) => slot + ':' + String(id);
-    const nextAssignee = (slot: number): bigint => {
-      const list = bySlot.get(slot) ?? [];
-      const first = list[0];
-      if (!first) throw Errors.validation('槽位 ' + slot + ' 没有可用阅卷成员');
-      let best = first;
-      let bestLoad = load.get(loadKey(slot, best)) ?? 0;
+    // 同一题必须选择 N 个不同阅卷人（禁止单人多评）
+    const pickDistinct = (slot: number, count: number): bigint[] => {
+      const list = [...(bySlot.get(slot) ?? [])]
+        .map((id) => ({ id, load: load.get(loadKey(slot, id)) ?? 0 }))
+        .sort((a, b) => (a.load === b.load ? (a.id < b.id ? -1 : 1) : a.load - b.load))
+        .slice(0, count)
+        .map((item) => item.id);
+      if (list.length < count) throw Errors.validation('槽位 ' + slot + ' 阅卷人数不足');
       for (const id of list) {
-        const value = load.get(loadKey(slot, id)) ?? 0;
-        if (value < bestLoad || (value === bestLoad && id < best)) {
-          best = id;
-          bestLoad = value;
-        }
+        load.set(loadKey(slot, id), (load.get(loadKey(slot, id)) ?? 0) + 1);
       }
-      load.set(loadKey(slot, best), (load.get(loadKey(slot, best)) ?? 0) + 1);
-      return best;
+      return list;
     };
     const tasks: { paperQuestionId: bigint; roundNo: number; assigneeId: bigint }[] = [];
     for (const q of questions) {
-      tasks.push({ paperQuestionId: q.id, roundNo: 1, assigneeId: nextAssignee(q.slot) });
-      tasks.push({ paperQuestionId: q.id, roundNo: 2, assigneeId: nextAssignee(q.slot) });
+      const count = reviewOf(q);
+      const assignees = pickDistinct(q.slot, count);
+      assignees.forEach((assigneeId, index) => {
+        tasks.push({ paperQuestionId: q.id, roundNo: index + 1, assigneeId });
+      });
     }
 
     const created = await tx.allocationBatch.create({

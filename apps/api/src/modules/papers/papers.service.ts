@@ -123,6 +123,7 @@ function toPaperDto(paper: PaperWithRelations, includeInternal = false): PaperDt
     uploadedById: String(paper.uploadedById),
     uploadedByName: uploadedName(paper),
     status: paper.status,
+    requiredReviewCount: paper.requiredReviewCount,
     score: paper.score === null ? null : Number(paper.score),
     finalizedAt: paper.finalizedAt?.toISOString() ?? null,
     pages: paper.pages.map(toPageDto),
@@ -153,7 +154,13 @@ async function findOwnPaperOrThrow(id: bigint, profileId: bigint): Promise<Paper
 function writeAudit(
   tx: Prisma.TransactionClient,
   operatorId: bigint,
-  action: 'PAPER_CREATE' | 'PAPER_PAGE_ADD' | 'PAPER_QUESTION_BIND' | 'PAPER_READY' | 'PAPER_ARCHIVE',
+  action:
+    | 'PAPER_CREATE'
+    | 'PAPER_PAGE_ADD'
+    | 'PAPER_QUESTION_BIND'
+    | 'PAPER_READY'
+    | 'PAPER_ARCHIVE'
+    | 'PAPER_REVIEW_COUNT',
   paper: { examId: bigint; studentId: bigint },
   remark: string,
 ) {
@@ -502,6 +509,50 @@ export async function setPaperStatus(
     return tx.paper.findUniqueOrThrow({ where: { id: paperId }, include: PAPER_INCLUDE });
   });
   return toPaperDto(updated);
+}
+
+export async function setPaperReviewCount(
+  operatorId: bigint,
+  paperId: bigint,
+  reviewCount: number | null,
+): Promise<PaperDto> {
+  const operator = await prisma.userAccount.findUnique({
+    where: { id: operatorId },
+    select: { role: true },
+  });
+  if (!operator) throw Errors.unauthorized();
+  if (reviewCount !== null && reviewCount < 2 && operator.role !== 'SUPER_ADMIN') {
+    throw Errors.validation('仅超级管理员可将评阅次数设置为低于 2');
+  }
+  const paper = await findPaperOrThrow(paperId);
+  if (paper.finalizedAt) throw Errors.validation('整卷已定稿，不能调整评阅次数');
+  if (paper.status === 'ARCHIVED') throw Errors.validation('整卷已归档，不能调整评阅次数');
+  if (reviewCount !== null) {
+    const activeTasks = await prisma.markingTask.count({
+      where: {
+        paperQuestion: { paperId },
+        status: { in: ['PENDING', 'COMPLETED'] },
+        allocation: { status: 'ACTIVE' },
+      },
+    });
+    if (activeTasks > 0) throw Errors.validation('整卷已进入分配，不能调整评阅次数');
+  }
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.paper.update({
+      where: { id: paperId },
+      data: { requiredReviewCount: reviewCount },
+      include: PAPER_INCLUDE,
+    });
+    await writeAudit(
+      tx,
+      operatorId,
+      'PAPER_REVIEW_COUNT',
+      paper,
+      '调整评阅次数为 ' + (reviewCount === null ? '考试默认' : reviewCount),
+    );
+    return row;
+  });
+  return toPaperDto(updated, true);
 }
 
 export async function listMyFinalizedPapers(

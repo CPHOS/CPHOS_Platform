@@ -33,6 +33,7 @@ function toConfigDto(config: ExamWithRelations['config']): ExamConfigDto | null 
     id: String(config.id),
     examId: String(config.examId),
     slotCount: config.slotCount,
+    reviewCount: config.reviewCount,
     defaultPoint: toNumber(config.defaultPoint),
     gap: toNumber(config.gap),
     titleMapping,
@@ -154,17 +155,27 @@ export async function upsertExamConfig(
     const exam = await tx.exam.findUnique({ where: { id }, select: { status: true } });
     if (!exam) throw Errors.notFound('考试');
     if (exam.status !== 'DRAFT') throw Errors.validation('仅草稿考试可修改配置（发布后请保持配置冻结）');
+    const operator = await tx.userAccount.findUnique({
+      where: { id: operatorId },
+      select: { role: true },
+    });
+    if (!operator) throw Errors.unauthorized();
+    if (input.reviewCount < 2 && operator.role !== 'SUPER_ADMIN') {
+      throw Errors.validation('仅超级管理员可将评阅次数设置为低于 2');
+    }
     await tx.examConfig.upsert({
       where: { examId: id },
       create: {
         examId: id,
         slotCount: input.slotCount,
+        reviewCount: input.reviewCount,
         defaultPoint: input.defaultPoint,
         gap: input.gap,
         titleMapping: input.titleMapping ?? [],
       },
       update: {
         slotCount: input.slotCount,
+        reviewCount: input.reviewCount,
         defaultPoint: input.defaultPoint,
         gap: input.gap,
         titleMapping: input.titleMapping ?? [],

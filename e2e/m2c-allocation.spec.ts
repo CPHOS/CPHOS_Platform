@@ -22,14 +22,14 @@ async function setupReadyPaper(request: any, suffix: string) {
   const examName = 'E2E分配考试' + suffix;
   const studentName = 'E2E分配学生' + suffix;
 
-  const adminToken = await apiLogin(request, ACCOUNTS.admin.account, ACCOUNTS.admin.password);
+  const adminToken = await apiLogin(request, ACCOUNTS.super.account, ACCOUNTS.super.password);
   const auth = { Authorization: 'Bearer ' + adminToken };
 
   const examRes = await request.post('/api/admin/exams', { headers: auth, data: { name: examName } });
   const exam = await examRes.json();
   await request.put('/api/admin/exams/' + exam.id + '/config', {
     headers: auth,
-    data: { slotCount: 2, defaultPoint: 10, gap: 1, titleMapping: [] },
+    data: { slotCount: 2, reviewCount: 1, defaultPoint: 10, gap: 1, titleMapping: [] },
   });
   await request.post('/api/admin/exams/' + exam.id + '/publish', { headers: auth, data: {} });
 

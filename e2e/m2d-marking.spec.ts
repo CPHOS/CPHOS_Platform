@@ -82,10 +82,18 @@ test('M2-D 双阅打分、分差仲裁、最终分与 BOT 认证', async ({ page
   await page.getByRole('button', { name: /确\s*定/ }).click();
   await expect(page.getByText('评分已提交')).toBeVisible();
 
-  await pendingRow().getByRole('button', { name: /打\s*分/ }).click();
-  await page.getByLabel('得分').fill('5');
-  await page.getByRole('button', { name: /确\s*定/ }).click();
-  await expect(page.getByText('评分已提交')).toBeVisible();
+  // 第二名阅卷人独立评分
+  const rank3Token = await apiLogin(request, ACCOUNTS.rankCoach3.account, ACCOUNTS.rankCoach3.password);
+  const rank3Auth = { Authorization: 'Bearer ' + rank3Token };
+  const rank3Tasks = await request
+    .get('/api/tasks/mine', { headers: rank3Auth })
+    .then((r: any) => r.json());
+  const q2Task = rank3Tasks.items.find((t: any) => t.paperQuestionId === q2.id && t.status === 'PENDING');
+  expect(q2Task).toBeTruthy();
+  await request.post('/api/tasks/' + q2Task.id + '/grade', {
+    headers: rank3Auth,
+    data: { score: 5 },
+  });
 
   // CPHOS 仲裁
   await login(page, ACCOUNTS.member.account, ACCOUNTS.member.password);

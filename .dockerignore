@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+**/.pgdata
+**/.uploads
+**/.devmail
+e2e/artifacts
+test-results
+playwright-report
+.git
+.env
+**/.env

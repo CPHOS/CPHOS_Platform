@@ -26,7 +26,7 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
   const examName = 'E2E成绩考试' + suffix;
   const studentName = 'E2E成绩学生' + suffix;
 
-  const adminToken = await apiLogin(request, ACCOUNTS.admin.account, ACCOUNTS.admin.password);
+  const adminToken = await apiLogin(request, ACCOUNTS.super.account, ACCOUNTS.super.password);
   const adminAuth = { Authorization: 'Bearer ' + adminToken };
 
   const exam = await request
@@ -34,7 +34,7 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
     .then((r: any) => r.json());
   await request.put('/api/admin/exams/' + exam.id + '/config', {
     headers: adminAuth,
-    data: { slotCount: 1, defaultPoint: 10, gap: 20, titleMapping: [] },
+    data: { slotCount: 1, reviewCount: 1, defaultPoint: 10, gap: 20, titleMapping: [] },
   });
   await request.post('/api/admin/exams/' + exam.id + '/publish', { headers: adminAuth, data: {} });
 
@@ -64,15 +64,14 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
 
   const tasks = await request.get('/api/tasks/mine', { headers: coachAuth }).then((r: any) => r.json());
   const myTasks = tasks.items.filter((t: any) => t.examId === exam.id);
-  expect(myTasks.length).toBe(2);
-  await request.post('/api/tasks/' + myTasks[0].id + '/grade', { headers: coachAuth, data: { score: 8 } });
-  await request.post('/api/tasks/' + myTasks[1].id + '/grade', { headers: coachAuth, data: { score: 10 } });
+  expect(myTasks.length).toBe(1);
+  await request.post('/api/tasks/' + myTasks[0].id + '/grade', { headers: coachAuth, data: { score: 10 } });
 
   await login(page, ACCOUNTS.rankCoach.account, ACCOUNTS.rankCoach.password);
   await page.goto('/app/results');
   await expect(page.getByRole('cell', { name: examName }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '1/1' }).first()).toBeVisible();
-  await expect(page.getByRole('cell', { name: '9' }).first()).toBeVisible();
+  await expect(page.getByRole('cell', { name: '10' }).first()).toBeVisible();
   await shot(page, 'platform-results.png');
 
   await page
@@ -80,7 +79,7 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
     .getByRole('button', { name: '查看详情' })
     .click();
   await expect(page.getByText('成绩详情：' + studentName)).toBeVisible();
-  await expect(page.getByText('双阅分：8 / 10')).toBeVisible();
+  await expect(page.getByText('双阅分：10')).toBeVisible();
   await expect(page.getByText('槽位 1').first()).toBeVisible();
   await shot(page, 'result-detail-drawer.png');
 });

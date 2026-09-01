@@ -16,6 +16,8 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
 
   const adminToken = await apiLogin(request, ACCOUNTS.admin.account, ACCOUNTS.admin.password);
   const adminAuth = { Authorization: 'Bearer ' + adminToken };
+  const superToken = await apiLogin(request, ACCOUNTS.super.account, ACCOUNTS.super.password);
+  const superAuth = { Authorization: 'Bearer ' + superToken };
   const coachToken = await apiLogin(request, ACCOUNTS.rankCoach.account, ACCOUNTS.rankCoach.password);
   const coachAuth = { Authorization: 'Bearer ' + coachToken };
 
@@ -88,6 +90,23 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   const abandonPaper = await request
     .post('/api/papers', { headers: coachAuth, data: { examId: exam.id, studentId: abandonStudent.id } })
     .then((r: any) => r.json());
+  // 普通管理员不可低于 2 次评阅；超管可设置低于最低限并恢复默认
+  const denyReview = await request.patch('/api/admin/papers/' + abandonPaper.id + '/review-count', {
+    headers: adminAuth,
+    data: { reviewCount: 1 },
+  });
+  expect(denyReview.status()).toBe(400);
+  const allowReview = await request.patch('/api/admin/papers/' + abandonPaper.id + '/review-count', {
+    headers: superAuth,
+    data: { reviewCount: 1 },
+  });
+  expect(allowReview.ok()).toBeTruthy();
+  const resetReview = await request.patch('/api/admin/papers/' + abandonPaper.id + '/review-count', {
+    headers: superAuth,
+    data: { reviewCount: null },
+  });
+  expect(resetReview.ok()).toBeTruthy();
+
   const abandonStatus = await request.post('/api/papers/' + abandonPaper.id + '/status', {
     headers: coachAuth,
     data: { status: 'ARCHIVED' },
@@ -127,11 +146,31 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   // 分差触发仲裁；此时结束考试应被拒绝
   const tasks = await request.get('/api/tasks/mine', { headers: coachAuth }).then((r: any) => r.json());
   const myTasks = tasks.items.filter((t: any) => t.examId === exam.id);
-  expect(myTasks.length).toBe(4);
+  expect(myTasks.length).toBe(2);
   for (const task of myTasks) {
     const grade = await request.post('/api/tasks/' + task.id + '/grade', {
       headers: coachAuth,
       data: { score: task.roundNo === 1 ? 5 : 10 },
+    });
+    expect(grade.ok()).toBeTruthy();
+  }
+  // 第二名阅卷人独立完成第二评
+  const secondToken = await apiLogin(request, ACCOUNTS.rankCoach2.account, ACCOUNTS.rankCoach2.password);
+  const secondAuth = { Authorization: 'Bearer ' + secondToken };
+  const secondTasks = await request
+    .get('/api/tasks/mine', { headers: secondAuth })
+    .then((r: any) => r.json());
+  const mySecondTasks = secondTasks.items.filter((t: any) => t.examId === exam.id);
+  expect(mySecondTasks.length).toBe(2);
+  for (const task of myTasks) {
+    const peer = mySecondTasks.find((t: any) => t.paperQuestionId === task.paperQuestionId);
+    expect(peer).toBeTruthy();
+    expect(peer.assigneeId).not.toBe(task.assigneeId);
+  }
+  for (const task of mySecondTasks) {
+    const grade = await request.post('/api/tasks/' + task.id + '/grade', {
+      headers: secondAuth,
+      data: { score: 10 },
     });
     expect(grade.ok()).toBeTruthy();
   }

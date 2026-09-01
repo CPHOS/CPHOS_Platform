@@ -270,6 +270,7 @@ export const examTitleSchema = z.object({
 
 export const upsertExamConfigSchema = z.object({
   slotCount: z.number().int().min(1).max(30),
+  reviewCount: z.number().int().min(1).max(20).default(2),
   defaultPoint: z.number().min(0).max(10000),
   gap: z.number().min(0).max(10000),
   titleMapping: z.array(examTitleSchema).max(40).optional(),
@@ -369,6 +370,11 @@ export const setPaperStatusSchema = z.object({
   status: z.enum(['READY', 'ARCHIVED']),
 });
 export type SetPaperStatusInput = z.infer<typeof setPaperStatusSchema>;
+
+export const setPaperReviewCountSchema = z.object({
+  reviewCount: z.number().int().min(1).max(20).nullable(),
+});
+export type SetPaperReviewCountInput = z.infer<typeof setPaperReviewCountSchema>;
 
 export const listPapersQuerySchema = z.object({
   examId: idSchema.optional(),

@@ -96,18 +96,21 @@ export async function gradeMarkingTask(
       },
     });
 
+    const requiredReviews =
+      task.paperQuestion.paper.requiredReviewCount ??
+      Number(task.paperQuestion.paper.exam.config?.reviewCount ?? 2);
     const tasks = await tx.markingTask.findMany({
       where: { paperQuestionId: task.paperQuestionId, allocation: { status: 'ACTIVE' } },
+      orderBy: { roundNo: 'asc' },
       select: { id: true, roundNo: true, score: true, status: true },
     });
-    if (tasks.length === 2 && tasks.every((t) => t.status === 'COMPLETED')) {
-      const first = tasks.find((t) => t.roundNo === 1);
-      const second = tasks.find((t) => t.roundNo === 2);
-      const s1 = first?.score ? Number(first.score) : 0;
-      const s2 = second?.score ? Number(second.score) : 0;
-      const gap = Number(task.paperQuestion.paper.exam.config?.gap ?? 0);
-      const diff = Math.abs(s1 - s2);
-      if (diff > gap) {
+    if (tasks.length === requiredReviews && tasks.every((t) => t.status === 'COMPLETED')) {
+      const scores = tasks.map((t) => (t.score === null ? new Prisma.Decimal(0) : t.score));
+      const gap = new Prisma.Decimal(task.paperQuestion.paper.exam.config?.gap ?? 0);
+      const minScore = Prisma.Decimal.min(...scores);
+      const maxScore = Prisma.Decimal.max(...scores);
+      const diff = maxScore.minus(minScore);
+      if (requiredReviews > 1 && diff.greaterThan(gap)) {
         await tx.arbitration.upsert({
           where: { paperQuestionId: task.paperQuestionId },
           create: { paperQuestionId: task.paperQuestionId, status: 'PENDING' },
@@ -127,7 +130,8 @@ export async function gradeMarkingTask(
         });
         await recomputePaper(tx, task.paperQuestion.paper.id);
       } else {
-        const final = (s1 + s2) / 2;
+        const total = scores.reduce((sum, score) => sum.plus(score), new Prisma.Decimal(0));
+        const final = total.div(requiredReviews).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
         await tx.paperQuestion.update({
           where: { id: task.paperQuestionId },
           data: { finalScore: final },

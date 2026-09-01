@@ -23,7 +23,7 @@ test('M3-A 排名分段与导出', async ({ page, request }) => {
   const examName = 'E2E排名考试' + suffix;
   const studentName = 'E2E排名学生' + suffix;
 
-  const adminToken = await apiLogin(request, ACCOUNTS.admin.account, ACCOUNTS.admin.password);
+  const adminToken = await apiLogin(request, ACCOUNTS.super.account, ACCOUNTS.super.password);
   const adminAuth = { Authorization: 'Bearer ' + adminToken };
 
   const exam = await request
@@ -31,7 +31,7 @@ test('M3-A 排名分段与导出', async ({ page, request }) => {
     .then((r: any) => r.json());
   await request.put('/api/admin/exams/' + exam.id + '/config', {
     headers: adminAuth,
-    data: { slotCount: 1, defaultPoint: 10, gap: 20, titleMapping: [] },
+    data: { slotCount: 1, reviewCount: 1, defaultPoint: 10, gap: 20, titleMapping: [] },
   });
   await request.post('/api/admin/exams/' + exam.id + '/publish', { headers: adminAuth, data: {} });
 
@@ -58,19 +58,18 @@ test('M3-A 排名分段与导出', async ({ page, request }) => {
 
   const tasks = await request.get('/api/tasks/mine', { headers: coachAuth }).then((r: any) => r.json());
   const myTasks = tasks.items.filter((t: any) => t.examId === exam.id);
-  expect(myTasks.length).toBe(2);
-  await request.post('/api/tasks/' + myTasks[0].id + '/grade', { headers: coachAuth, data: { score: 8 } });
-  await request.post('/api/tasks/' + myTasks[1].id + '/grade', { headers: coachAuth, data: { score: 10 } });
+  expect(myTasks.length).toBe(1);
+  await request.post('/api/tasks/' + myTasks[0].id + '/grade', { headers: coachAuth, data: { score: 10 } });
 
   const finalized = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());
-  expect(finalized.score).toBe(9);
+  expect(finalized.score).toBe(10);
 
   const rankingRes = await request.get('/api/admin/exams/' + exam.id + '/ranking', {
     headers: adminAuth,
   });
   const ranking = await rankingRes.json();
   expect(ranking.entries[0].studentName).toBe(studentName);
-  expect(ranking.entries[0].score).toBe(9);
+  expect(ranking.entries[0].score).toBe(10);
   expect(ranking.entries[0].segmentLabel).toBe('前1');
 
   const csv = await request.get('/api/admin/exams/' + exam.id + '/ranking/export', {
@@ -80,7 +79,7 @@ test('M3-A 排名分段与导出', async ({ page, request }) => {
   expect(csv.ok()).toBeTruthy();
   const text = await csv.text();
   expect(text).toContain(studentName);
-  expect(text).toContain('9');
+  expect(text).toContain('10');
 
   // UI 排名抽屉与 Excel 下载
   await login(page, ACCOUNTS.admin.account, ACCOUNTS.admin.password);

@@ -241,6 +241,7 @@ export interface ExamConfigDto {
   id: string;
   examId: string;
   slotCount: number;
+  reviewCount: number;
   defaultPoint: number;
   gap: number;
   titleMapping: ExamConfigTitleDto[] | null;
@@ -345,6 +346,7 @@ export interface PaperDto {
   uploadedById: string;
   uploadedByName: string | null;
   status: PaperStatus;
+  requiredReviewCount: number | null;
   score: number | null;
   finalizedAt: string | null;
   pages: PaperPageDto[];
@@ -367,6 +369,7 @@ export interface AllocationSlotPreviewDto {
   questionCount: number;
   taskCount: number;
   examinerCount: number;
+  requiredReviewers: number;
   minTasks: number;
   maxTasks: number;
 }

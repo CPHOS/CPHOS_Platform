@@ -36,6 +36,7 @@ interface ExamForm {
 
 interface ConfigForm {
   slotCount: number;
+  reviewCount: number;
   defaultPoint: number;
   gap: number;
   titleMapping?: { slot: number; title: string; questionLabel?: string; point?: number }[];
@@ -130,6 +131,7 @@ export function ExamsAdminPage() {
     setConfiguring(exam);
     configForm.setFieldsValue({
       slotCount: exam.config?.slotCount ?? 8,
+      reviewCount: exam.config?.reviewCount ?? 2,
       defaultPoint: exam.config?.defaultPoint ?? 0,
       gap: exam.config?.gap ?? 10,
       titleMapping: exam.config?.titleMapping ?? [],
@@ -144,6 +146,7 @@ export function ExamsAdminPage() {
     try {
       const input: UpsertExamConfigInput = {
         slotCount: values.slotCount,
+        reviewCount: values.reviewCount,
         defaultPoint: values.defaultPoint,
         gap: values.gap,
         titleMapping: values.titleMapping?.filter((x) => x && x.title) ?? [],
@@ -238,7 +241,7 @@ export function ExamsAdminPage() {
       responsive: ['md'],
       render: (_, r) =>
         r.config
-          ? '槽位 ' + r.config.slotCount + ' · 分差 ' + r.config.gap
+          ? '槽位 ' + r.config.slotCount + ' · ' + r.config.reviewCount + ' 评 · 分差 ' + r.config.gap
           : '未配置',
     },
     {
@@ -364,6 +367,14 @@ export function ExamsAdminPage() {
             <Form.Item name="slotCount" label="槽位/题目总数" rules={[{ required: true }]}>
               <InputNumber min={1} max={30} />
             </Form.Item>
+            <Form.Item
+              name="reviewCount"
+              label="每题评阅次数"
+              tooltip="普通管理员最低 2；超级管理员可为 1（单评直接定分）"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={1} max={20} />
+            </Form.Item>
             <Form.Item name="defaultPoint" label="默认每题满分" rules={[{ required: true }]}>
               <InputNumber min={0} max={10000} step={0.5} />
             </Form.Item>
@@ -430,11 +441,11 @@ export function ExamsAdminPage() {
           <Card size="small" title="均衡预览" style={{ marginBottom: 16 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <span>
-                就绪整卷 {allocPreview.readyPaperCount} 套 · 题目 {allocPreview.questionCount} 道 · 双阅任务 {allocPreview.taskCount} 个
+                就绪整卷 {allocPreview.readyPaperCount} 套 · 题目 {allocPreview.questionCount} 道 · 阅卷任务 {allocPreview.taskCount} 个
               </span>
               {allocPreview.unassignedSlots.length > 0 && (
                 <span style={{ color: '#cf222e' }}>
-                  以下槽位没有可用阅卷成员：{allocPreview.unassignedSlots.join('、')}
+                  以下槽位阅卷人数不足（禁止同一人重复评阅）：{allocPreview.unassignedSlots.join('、')}
                 </span>
               )}
               <Table
@@ -445,7 +456,8 @@ export function ExamsAdminPage() {
                 columns={[
                   { title: '槽位', dataIndex: 'slot' },
                   { title: '题数', dataIndex: 'questionCount' },
-                  { title: '双阅任务', dataIndex: 'taskCount' },
+                  { title: '任务数', dataIndex: 'taskCount' },
+                  { title: '需评次', dataIndex: 'requiredReviewers' },
                   { title: '阅卷人数', dataIndex: 'examinerCount' },
                   { title: '最少/人', dataIndex: 'minTasks' },
                   { title: '最多/人', dataIndex: 'maxTasks' },

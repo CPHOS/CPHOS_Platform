@@ -58,6 +58,19 @@ pnpm --filter @cphos/api start   # node apps/api/dist/server.js
 - Nginx：`deploy/nginx.conf.example`
 - Nginx 安全头片段：复制到 `/etc/nginx/snippets/cphos-security-headers.conf`
 - PM2：`deploy/ecosystem.config.cjs.example`
+- Docker：
+  - `deploy/docker/Dockerfile.api`
+  - `deploy/docker/Dockerfile.web`
+  - `deploy/docker/nginx-web.conf`
+  - `docker-compose.yml.example`
+
+Docker 启动示例：
+
+```bash
+cp docker-compose.yml.example docker-compose.yml
+# 修改 compose 中所有 CHANGE_ME 密钥与正式域名后
+docker compose up -d --build
+```
 
 ```bash
 sudo mkdir -p /etc/nginx/snippets
