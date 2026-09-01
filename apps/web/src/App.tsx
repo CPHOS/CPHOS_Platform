@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { AppstoreOutlined, AuditOutlined, HomeOutlined, IdcardOutlined, TeamOutlined, UsergroupAddOutlined, UserOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, AuditOutlined, HomeOutlined, IdcardOutlined, ReadOutlined, TeamOutlined, UsergroupAddOutlined, UserOutlined } from '@ant-design/icons';
 import { RequireAuth } from './components/RequireAuth';
 import { ShellLayout } from './layouts/ShellLayout';
 import { AdminHome } from './pages/admin/Home';
@@ -8,6 +8,7 @@ import { AuditDetail } from './pages/admin/audit/Detail';
 import { AccountsList } from './pages/admin/accounts/List';
 import { MembersList } from './pages/admin/members/List';
 import { TeamsList } from './pages/admin/teams/List';
+import { DictsPage } from './pages/admin/dicts/List';
 import { LoginPage } from './pages/auth/Login';
 import { RegisterPage } from './pages/auth/Register';
 import { VerifyEmailPage } from './pages/auth/VerifyEmail';
@@ -45,7 +46,7 @@ export function App() {
               kind="platform"
               nav={[
                 { key: '/app', label: '工作台', icon: <HomeOutlined /> },
-                { key: '/app/profile', label: '个人信息', icon: <IdcardOutlined /> },
+                { key: '/app/profile', label: '个人信息', icon: <IdcardOutlined />, group: '个人' },
               ]}
             />
           </RequireAuth>
@@ -63,7 +64,7 @@ export function App() {
               kind="cphos"
               nav={[
                 { key: '/cphos', label: '工作台', icon: <HomeOutlined /> },
-                { key: '/cphos/profile', label: '个人信息', icon: <IdcardOutlined /> },
+                { key: '/cphos/profile', label: '个人信息', icon: <IdcardOutlined />, group: '个人' },
               ]}
             />
           </RequireAuth>
@@ -81,11 +82,12 @@ export function App() {
               kind="admin"
               nav={[
                 { key: '/admin', label: '概览', icon: <AppstoreOutlined /> },
-                { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined /> },
-                { key: '/admin/members', label: '成员管理', icon: <TeamOutlined /> },
-                { key: '/admin/teams', label: '团队管理', icon: <UsergroupAddOutlined /> },
-                { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined /> },
-                { key: '/admin/profile', label: '个人信息', icon: <IdcardOutlined /> },
+                { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined />, group: '管理' },
+                { key: '/admin/members', label: '成员管理', icon: <TeamOutlined />, group: '管理' },
+                { key: '/admin/teams', label: '团队管理', icon: <UsergroupAddOutlined />, group: '管理' },
+                { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined />, group: '管理' },
+                { key: '/admin/dicts', label: '字典管理', icon: <ReadOutlined />, group: '基础数据' },
+                { key: '/admin/profile', label: '个人信息', icon: <IdcardOutlined />, group: '个人' },
               ]}
             />
           </RequireAuth>
@@ -97,6 +99,7 @@ export function App() {
         <Route path="members" element={<MembersList />} />
         <Route path="teams" element={<TeamsList />} />
         <Route path="accounts" element={<AccountsList />} />
+        <Route path="dicts" element={<DictsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

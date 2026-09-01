@@ -159,3 +159,39 @@ export const listTeamsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListTeamsQuery = z.infer<typeof listTeamsQuerySchema>;
+
+// ---------- 字典维护（管理域） ----------
+
+const dictNameSchema = z.string().trim().min(1, '请输入名称').max(50, '名称过长');
+
+export const createAreaSchema = z.object({ name: dictNameSchema });
+export type CreateAreaInput = z.infer<typeof createAreaSchema>;
+
+export const createSchoolSchema = z.object({
+  name: dictNameSchema,
+  areaId: idSchema,
+});
+export type CreateSchoolInput = z.infer<typeof createSchoolSchema>;
+
+export const updateSchoolSchema = z.object({
+  name: dictNameSchema.optional(),
+  areaId: idSchema.optional(),
+});
+export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>;
+
+export const createDictEntrySchema = z.object({ name: dictNameSchema });
+export type CreateDictEntryInput = z.infer<typeof createDictEntrySchema>;
+
+/** 简单字典种类（年级/奖项/题号） */
+export const DICT_KINDS = ['grades', 'prizes', 'topics'] as const;
+export type DictKind = (typeof DICT_KINDS)[number];
+
+export const dictKindSchema = z.enum(DICT_KINDS);
+
+export const listSchoolsQuerySchema = z.object({
+  areaId: idSchema.optional(),
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListSchoolsQuery = z.infer<typeof listSchoolsQuerySchema>;

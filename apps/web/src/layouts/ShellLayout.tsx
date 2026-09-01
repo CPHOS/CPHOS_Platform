@@ -13,6 +13,8 @@ export interface ShellNavItem {
   key: string;
   label: string;
   icon?: ReactNode;
+  /** 侧栏分组标题（同一 group 的条目归到一组） */
+  group?: string;
 }
 
 interface ShellLayoutProps {
@@ -20,7 +22,7 @@ interface ShellLayoutProps {
   nav: ShellNavItem[];
 }
 
-/** 通用三端壳：顶部导航（品牌/用户）+ 左侧分区 Sider + 内容区（页标题在内容顶部） */
+/** 通用三端壳：顶部导航（品牌/用户）+ 左侧分组 Sider + 内容区（页标题在内容顶部） */
 export function ShellLayout({ kind, nav }: ShellLayoutProps) {
   const meta = SHELL_THEMES[kind];
   const user = useAuthStore((s) => s.user);
@@ -37,7 +39,23 @@ export function ShellLayout({ kind, nav }: ShellLayoutProps) {
 
   const current = nav.find((n) => n.key === selectedKey);
   const displayName = user?.displayName ?? user?.profile?.realName ?? user?.email ?? user?.loginName;
-  const menuItems: MenuProps['items'] = nav.map((n) => ({ key: n.key, icon: n.icon, label: n.label }));
+
+  // 按 group 归类生成菜单：无 group 的条目置顶，有 group 的按分组标题折叠
+  const menuItems: MenuProps['items'] = useMemo(() => {
+    const groups = new Map<string | undefined, ShellNavItem[]>();
+    for (const n of nav) {
+      const list = groups.get(n.group) ?? [];
+      list.push(n);
+      groups.set(n.group, list);
+    }
+    const items: MenuProps['items'] = [];
+    for (const [group, groupItems] of groups) {
+      const children = groupItems.map((n) => ({ key: n.key, icon: n.icon, label: n.label }));
+      if (group) items.push({ type: 'group', label: group, children });
+      else items.push(...children);
+    }
+    return items;
+  }, [nav]);
 
   return (
     <ConfigProvider theme={shellTheme(kind)}>
@@ -100,23 +118,12 @@ export function ShellLayout({ kind, nav }: ShellLayoutProps) {
             trigger={null}
             style={{ borderRight: `1px solid ${token.colorBorderSecondary}`, overflowY: 'auto' }}
           >
-            <div
-              className="shell-section"
-              style={{
-                fontSize: 12,
-                color: token.colorTextSecondary,
-                padding: '16px 16px 8px',
-                letterSpacing: 1,
-              }}
-            >
-              {meta.section}
-            </div>
             <Menu
               mode="inline"
               selectedKeys={[selectedKey]}
               items={menuItems}
               onClick={({ key }) => navigate(key)}
-              style={{ border: 'none', padding: '0 8px' }}
+              style={{ border: 'none', padding: '8px 8px 0' }}
             />
           </Layout.Sider>
 

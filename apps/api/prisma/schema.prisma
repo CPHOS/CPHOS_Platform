@@ -52,6 +52,9 @@ enum AuditAction {
   TEAM_UPDATE // 团队信息修改
   TEAM_ADD_MEMBER // 团队新增子账号
   TEAM_REMOVE_MEMBER // 团队移除成员
+  DICT_CREATE // 字典新增
+  DICT_UPDATE // 字典修改
+  DICT_DELETE // 字典删除
 }
 
 enum MemberRole {
@@ -192,14 +195,16 @@ model Team {
 // ---------- 主数据字典（旧库导入种子，保留旧 id） ----------
 
 model Area {
-  id   BigInt @id
-  name String
+  id      BigInt   @id
+  name    String
+  schools School[]
 }
 
 model School {
   id      BigInt           @id
-  name    String
+  name    String           @unique
   areaId  BigInt
+  area    Area             @relation(fields: [areaId], references: [id])
   members MemberProfile[]
 
   @@index([areaId])

@@ -1,0 +1,4 @@
+-- AlterEnum：字典维护审计动作
+ALTER TYPE "AuditAction" ADD VALUE 'DICT_CREATE';
+ALTER TYPE "AuditAction" ADD VALUE 'DICT_UPDATE';
+ALTER TYPE "AuditAction" ADD VALUE 'DICT_DELETE';

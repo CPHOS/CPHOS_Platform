@@ -177,3 +177,31 @@ export interface TeamListDto {
   page: number;
   pageSize: number;
 }
+
+// ---------- 字典维护（管理域） ----------
+
+export interface AreaDto {
+  id: string;
+  name: string;
+  schoolCount: number;
+}
+
+export interface ManagedSchoolDto {
+  id: string;
+  name: string;
+  areaId: string;
+  areaName: string | null;
+  memberCount: number;
+}
+
+export interface ManagedSchoolListDto {
+  items: ManagedSchoolDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface DictEntryDto {
+  id: string;
+  name: string;
+}
