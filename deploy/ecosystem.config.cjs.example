@@ -1,0 +1,20 @@
+// PM2 模板：复制为 ecosystem.config.cjs 后按实际路径修改
+module.exports = {
+  apps: [
+    {
+      name: 'cphos-api',
+      cwd: '/var/www/cphos',
+      script: 'apps/api/dist/server.js',
+      env_file: 'apps/api/.env',
+      instances: 2,
+      exec_mode: 'cluster',
+      max_memory_restart: '512M',
+      out_file: '/var/log/cphos/api.out.log',
+      error_file: '/var/log/cphos/api.err.log',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+  ],
+};

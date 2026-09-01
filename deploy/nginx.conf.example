@@ -1,0 +1,38 @@
+# CPHOS 生产 Nginx 模板
+server {
+    listen 80;
+    server_name exam.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name exam.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/exam.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/exam.example.com/privkey.pem;
+
+    root /var/www/cphos/web;
+    index index.html;
+    client_max_body_size 25m;
+
+    access_log /var/log/nginx/cphos.access.log;
+    error_log  /var/log/nginx/cphos.error.log;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+}

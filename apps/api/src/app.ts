@@ -2,8 +2,10 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
+import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
+import { prisma } from './db.js';
 import { env } from './env.js';
 import { ERROR_CODES } from '@cphos/shared';
 import { authPlugin } from './plugins/auth.js';
@@ -30,20 +32,27 @@ import { adminRankingRoutes } from './modules/ranking/ranking.admin.routes.js';
 import { resultRoutes } from './modules/results/results.routes.js';
 
 export async function buildApp() {
+  const redact = {
+    paths: ['req.headers.authorization', 'req.headers["x-bot-token"]'],
+    censor: '[REDACTED]',
+  };
   const app = Fastify({
+    trustProxy: env.TRUST_PROXY,
+    bodyLimit: env.BODY_LIMIT_MB * 1024 * 1024,
     logger:
       env.NODE_ENV === 'development'
-        ? { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }
-        : true,
+        ? { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } }, redact }
+        : { redact },
   });
 
+  await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, {
     origin: env.CORS_ORIGIN.split(',').map((s) => s.trim()),
     credentials: true,
   });
   await app.register(cookie);
   await app.register(multipart, {
-    limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+    limits: { fileSize: env.UPLOAD_MAX_MB * 1024 * 1024, files: 1 },
   });
   await app.register(jwt, {
     secret: env.JWT_SECRET,
@@ -51,8 +60,8 @@ export async function buildApp() {
   });
   await app.register(rateLimit, {
     global: true,
-    max: 600,
-    timeWindow: '1 minute',
+    max: env.RATE_LIMIT_MAX,
+    timeWindow: env.RATE_LIMIT_WINDOW,
   });
   await app.register(authPlugin);
   await app.register(authorizePlugin);
@@ -64,6 +73,15 @@ export async function buildApp() {
   });
 
   app.get('/api/health', async () => ({ status: 'ok', time: new Date().toISOString() }));
+
+  app.get('/api/health/ready', async (_req, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { status: 'ready', time: new Date().toISOString() };
+    } catch {
+      return reply.code(503).send({ status: 'not_ready' });
+    }
+  });
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(dictRoutes, { prefix: '/api/dict' });

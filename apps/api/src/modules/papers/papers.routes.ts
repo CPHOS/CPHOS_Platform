@@ -48,7 +48,10 @@ export async function paperRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  app.post('/papers/:id/pages/upload', { onRequest: guard }, async (req) => {
+  app.post(
+    '/papers/:id/pages/upload',
+    { onRequest: guard, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (req) => {
     const { id } = req.params as { id: string };
     const file = await req.file();
     if (!file) throw Errors.validation('请选择答题卡文件');
@@ -65,7 +68,8 @@ export async function paperRoutes(app: FastifyInstance): Promise<void> {
       originalName: file.filename,
       sizeBytes: buffer.length,
     });
-  });
+    },
+  );
 
   app.get('/papers/:id/pages/:pageId/file', { onRequest: guard }, async (req, reply) => {
     const { id, pageId } = req.params as { id: string; pageId: string };

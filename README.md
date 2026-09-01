@@ -46,3 +46,16 @@ pnpm e2e:debug      # 逐步调试
 ```
 
 UI 走查截图输出到 `e2e/artifacts/`（已 gitignore）；测试报告在 `playwright-report/`。
+
+## 生产构建与配置模板
+
+```bash
+pnpm build                 # shared + api -> dist，web -> dist
+pnpm --filter @cphos/api start   # node apps/api/dist/server.js
+```
+
+- 生产环境变量模板：`apps/api/.env.production.example`
+- Nginx：`deploy/nginx.conf.example`
+- PM2：`deploy/ecosystem.config.cjs.example`
+
+生产必须显式配置：`NODE_ENV=production`、正式 `DATABASE_URL`、强随机 `JWT_SECRET`/`CODE_SALT`、`CORS_ORIGIN`、SMTP；上传目录生产建议替换为对象存储。

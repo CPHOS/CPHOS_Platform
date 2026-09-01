@@ -12,7 +12,10 @@ export async function adminRankingRoutes(app: FastifyInstance): Promise<void> {
     return getRanking(BigInt(idSchema.parse(examId)), query.segments);
   });
 
-  app.get('/exams/:examId/ranking/export', { onRequest: guard }, async (req, reply) => {
+  app.get(
+    '/exams/:examId/ranking/export',
+    { onRequest: guard, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (req, reply) => {
     const { examId } = req.params as { examId: string };
     const query = rankingExportQuerySchema.parse(req.query);
     const rankingQuery = rankingQuerySchema.parse(req.query);
@@ -28,5 +31,6 @@ export async function adminRankingRoutes(app: FastifyInstance): Promise<void> {
     );
     reply.type(file.contentType);
     return reply.send(Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer));
-  });
+    },
+  );
 }

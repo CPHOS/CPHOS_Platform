@@ -15,5 +15,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          antd: ['antd', '@ant-design/icons'],
+          query: ['@tanstack/react-query', 'axios', 'zustand'],
+        },
+      },
+    },
   },
 });

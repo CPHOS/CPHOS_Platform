@@ -36,6 +36,7 @@ interface JwtPayload {
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  const authLimit = { max: 60, timeWindow: '1 minute' };
   /** 为某个用户签发访问令牌 */
   const signAccess = (app: FastifyInstance, userId: bigint, email: string | null) =>
     app.jwt.sign({ sub: String(userId), email });
@@ -53,30 +54,30 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     });
   };
 
-  app.post('/register', async (req, reply) => {
+  app.post('/register', { config: { rateLimit: authLimit } }, async (req, reply) => {
     const input = registerSchema.parse(req.body);
     const result = await register(input);
     return reply.code(201).send(result);
   });
 
-  app.post('/send-code', async (req) => {
+  app.post('/send-code', { config: { rateLimit: authLimit } }, async (req) => {
     const input = sendCodeSchema.parse(req.body);
     return sendCode(input);
   });
 
-  app.post('/verify-email', async (req) => {
+  app.post('/verify-email', { config: { rateLimit: authLimit } }, async (req) => {
     const input = verifyEmailSchema.parse(req.body);
     return verifyEmail(input);
   });
 
   // ---------- 账号安全 ----------
 
-  app.post('/password/forgot', async (req) => {
+  app.post('/password/forgot', { config: { rateLimit: authLimit } }, async (req) => {
     const input = forgotPasswordSchema.parse(req.body);
     return forgotPassword(input);
   });
 
-  app.post('/password/reset', async (req) => {
+  app.post('/password/reset', { config: { rateLimit: authLimit } }, async (req) => {
     const input = resetPasswordSchema.parse(req.body);
     return resetPassword(input);
   });
@@ -98,7 +99,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return confirmEmailChange(BigInt(req.user.sub), input);
   });
 
-  app.post('/login', async (req, reply) => {
+  app.post('/login', { config: { rateLimit: authLimit } }, async (req, reply) => {
     const input = loginSchema.parse(req.body);
     const { user, refreshToken } = await login(input);
     const accessToken = await signAccess(app, BigInt(user.id), user.email);
