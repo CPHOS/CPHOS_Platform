@@ -1,5 +1,6 @@
 import { Card, Descriptions, Tag } from 'antd';
 import { ACCOUNT_ROLE_LABELS, ROLE_LABELS, USER_STATUS_LABELS } from '@cphos/shared';
+import { SecuritySettings } from '../components/SecuritySettings';
 import { useAuthStore } from '../stores/auth';
 
 const ROLE_COLORS: Record<string, string> = {
@@ -53,10 +54,16 @@ export function ProfilePage() {
               <Tag>{ROLE_LABELS[user.profile.role]}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="默认批阅槽位">{user.profile.defaultSlot ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="上传限额">{user.profile.uploadLimit}</Descriptions.Item>
+            <Descriptions.Item label="个人上传限额">{user.profile.uploadLimit}</Descriptions.Item>
+            <Descriptions.Item label="所属团队">{user.profile.teamName ?? '未加入团队'}</Descriptions.Item>
+            <Descriptions.Item label="团队共享限额">
+              {user.profile.teamUploadLimit ?? '-'}
+            </Descriptions.Item>
           </Descriptions>
         </Card>
       )}
+
+      <SecuritySettings />
     </div>
   );
 }

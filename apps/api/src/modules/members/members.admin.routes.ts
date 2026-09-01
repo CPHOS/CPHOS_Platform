@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { idSchema, listMembersQuerySchema, updateMemberSchema } from '@cphos/shared';
 import { getMember, listMembers, updateMember } from './members.service.js';
+import { listMemberOptions } from '../teams/teams.service.js';
 
 /** 管理侧：成员档案管理（列表/详情/更新），仅 ADMIN / SUPER_ADMIN */
 export async function adminMemberRoutes(app: FastifyInstance): Promise<void> {
@@ -9,6 +10,10 @@ export async function adminMemberRoutes(app: FastifyInstance): Promise<void> {
   app.get('/members', { onRequest: guard }, async (req) => {
     const query = listMembersQuerySchema.parse(req.query);
     return listMembers(query);
+  });
+
+  app.get('/members/options', { onRequest: guard }, async () => {
+    return listMemberOptions();
   });
 
   app.get('/members/:userId', { onRequest: guard }, async (req) => {

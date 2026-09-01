@@ -1,6 +1,7 @@
 // CPHOS 新平台 · 核心数据模型（PostgreSQL / Prisma）
 // 设计依据：docs/02_新系统设计.md §6（实体模型草案）
-// 原则：认证与授权分离、状态机、审计留痕、外键/唯一约束、BigInt 主键（对齐旧库 ID 导入）
+// 原则：认证与授权分离、状态机、审计留痕、外键/唯一约束、BigInt 主键
+// 说明：新系统不导入历史数据；字典使用数据库自增 ID，管理员可按功能需要维护。
 
 generator client {
   provider = "prisma-client-js"
@@ -49,6 +50,9 @@ enum AuditAction {
   ROLE_CHANGE // 账号层级变更（提升/降级）
   STATUS_CHANGE // 账号状态变更（启用/禁用）
   MEMBER_UPDATE // 成员资料修改
+  TEAM_CREATE // 创建团队
+  TEAM_UPDATE // 更新团队
+  TEAM_DELETE // 删除团队
 }
 
 enum MemberRole {
@@ -59,23 +63,26 @@ enum MemberRole {
 // ---------- 认证域 ----------
 
 model UserAccount {
-  id              BigInt      @id @default(autoincrement())
-  email           String?     @unique // 仅平台用户有（登录+验证码）；内部账号为 NULL
-  loginName       String?     @unique // 内部账号用户名（小写规范化）；平台用户为 NULL
-  displayName     String? // 显示名称（内部账号建档时填写）
-  emailVerifiedAt DateTime?
-  passwordHash    String?
-  role            AccountRole @default(PLATFORM_USER)
-  protected       Boolean     @default(false) // 唯一超级管理员：不可删除/禁用/降级
-  status          UserStatus  @default(PENDING)
-  legacyMemberId  BigInt?     @unique // 认领绑定的旧平台成员 id（单向一次性）
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                  BigInt      @id @default(autoincrement())
+  email               String?     @unique // 仅平台用户/已绑定邮箱账号有（登录+验证码）；内部账号可为 NULL
+  loginName           String?     @unique // 内部账号用户名（小写规范化）；平台用户为 NULL
+  displayName         String? // 显示名称（内部账号建档时填写）
+  emailVerifiedAt     DateTime?
+  passwordHash        String?
+  // 会话版本：改密/重置/禁用时 +1，用于让旧 refresh token 立即失效
+  tokenVersion        Int         @default(0)
+  role                AccountRole @default(PLATFORM_USER)
+  protected           Boolean     @default(false) // 唯一超级管理员：不可删除/禁用/降级
+  status              UserStatus  @default(PENDING)
+  legacyMemberId      BigInt?     @unique // 认领绑定的旧平台成员 id（单向一次性）
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   emailCodes    EmailCode[]
   refreshTokens RefreshToken[]
   applications  AuditApplication[]
   profile       MemberProfile?
+  ledTeam       Team?              @relation("TeamLeader")
 }
 
 model EmailCode {
@@ -86,21 +93,25 @@ model EmailCode {
   expiresAt     DateTime
   attempts      Int              @default(0)
   consumedAt    DateTime?
+  // 注册验证码绑定的候选密码 hash：verifyEmail 只应用被核销验证码对应的密码
+  pendingPasswordHash String?
   createdAt     DateTime         @default(now())
   userAccount   UserAccount?     @relation(fields: [userAccountId], references: [id])
   userAccountId BigInt?
 
   @@index([email, purpose, createdAt])
+  @@index([userAccountId])
 }
 
 model RefreshToken {
   id        BigInt      @id @default(autoincrement())
   userId    BigInt
   user      UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String      @unique // sha256 存储
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime    @default(now())
+  tokenHash    String      @unique // sha256 存储
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  tokenVersion Int         @default(0) // 签发时的用户会话版本
+  createdAt    DateTime    @default(now())
 
   @@index([userId])
 }
@@ -113,6 +124,7 @@ model AuditApplication {
   user                  UserAccount            @relation(fields: [userId], references: [id], onDelete: Cascade)
   realName              String
   schoolId              BigInt?
+  school                School?                @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   wechatNickname        String?
   contact               String?
   applyNote             String?
@@ -129,6 +141,7 @@ model AuditApplication {
   materials AuditMaterial[]
 
   @@index([status, createdAt])
+  @@index([schoolId])
 }
 
 model AuditMaterial {
@@ -146,12 +159,13 @@ model AuditLog {
   operatorId     BigInt
   action         AuditAction
   legacyMemberId BigInt?
-  targetUserId   BigInt? // 账号管理类操作的目标账号
+  targetUserId   BigInt? // 账号/团队管理类操作的目标对象
   remark         String?
   createdAt      DateTime    @default(now())
 
   @@index([applicationId, createdAt])
   @@index([targetUserId, createdAt])
+  @@index([action, createdAt])
 }
 
 // ---------- 业务用户域 ----------
@@ -165,59 +179,68 @@ model MemberProfile {
   school      School?     @relation(fields: [schoolId], references: [id])
   role        MemberRole  @default(LEADER)
   teamId      BigInt?
+  team        Team?       @relation("TeamMembers", fields: [teamId], references: [id], onDelete: SetNull)
   defaultSlot Int? // 默认批阅槽位 1~10
   uploadLimit Int         @default(100)
   auditStatus Int         @default(0) // 0 待审核 1 已通过（对齐旧平台语义）
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  team Team? @relation(fields: [teamId], references: [id])
+  @@index([schoolId])
+  @@index([teamId])
 }
 
 model Team {
-  id        BigInt   @id @default(autoincrement())
-  name      String?
-  leaderId  BigInt
-  createdAt DateTime @default(now())
+  id          BigInt      @id @default(autoincrement())
+  name        String
+  uploadLimit Int         @default(100) // 团队共享上传限额（一场考试内成员共享）
+  leaderId    BigInt      @unique // 一个成员最多担任一个团队的负责人（并发兜底）
+  leader      UserAccount @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: Restrict)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  members MemberProfile[]
+  members MemberProfile[] @relation("TeamMembers")
 }
 
-// ---------- 主数据字典（旧库导入种子，保留旧 id） ----------
+// ---------- 主数据字典（新系统自增 ID，管理员维护） ----------
 
 model Area {
-  id   BigInt @id
-  name String
+  id      BigInt   @id @default(autoincrement())
+  name    String   @unique
+  schools School[]
 }
 
 model School {
-  id      BigInt           @id
-  name    String
-  areaId  BigInt
-  members MemberProfile[]
+  id           BigInt             @id @default(autoincrement())
+  name         String
+  areaId       BigInt
+  area         Area               @relation(fields: [areaId], references: [id])
+  members      MemberProfile[]
+  applications AuditApplication[]
 
+  @@unique([name, areaId])
   @@index([areaId])
 }
 
 model Grade {
-  id   BigInt @id
-  name String
+  id   BigInt @id @default(autoincrement())
+  name String @unique
 }
 
 model Prize {
-  id   BigInt @id
-  name String
+  id   BigInt @id @default(autoincrement())
+  name String @unique
 }
 
 model Topic {
-  id   BigInt @id
-  name String
+  id   BigInt @id @default(autoincrement())
+  name String @unique
 }
 
-// ---------- 老用户认领参照快照（只读用途，来自旧库最小导入） ----------
+// ---------- 老用户认领参照快照（可选兼容功能，不主动导入历史数据） ----------
 
 model LegacyMemberRef {
-  id             BigInt    @id
+  id             BigInt    @id @default(autoincrement())
   realName       String?
   wechatNickname String?
   wechatAvatar   String?

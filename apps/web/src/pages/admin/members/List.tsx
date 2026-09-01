@@ -95,6 +95,7 @@ export function MembersList() {
     },
     { title: '默认槽位', dataIndex: 'defaultSlot', render: (v: number | null) => v ?? '-', responsive: ['md'] },
     { title: '上传限额', dataIndex: 'uploadLimit', responsive: ['lg'] },
+    { title: '团队', dataIndex: 'teamName', render: (v: string | null) => v ?? '未加入', responsive: ['lg'], ellipsis: true },
     { title: '账号', render: (_, r) => r.account.email ?? r.account.loginName ?? '-', responsive: ['md'], ellipsis: true },
     { title: '操作', render: (_, r) => <a onClick={() => openEdit(r)}>编辑</a> },
   ];
@@ -169,9 +170,18 @@ export function MembersList() {
               }))}
             />
           </Form.Item>
-          <Form.Item name="role" label="业务角色" rules={[{ required: true, message: '请选择角色' }]}>
-            {/* TODO(Q3 团队模型)：定案前暂不提供附属教练（COACH 需团队绑定） */}
-            <Select options={[{ value: 'LEADER', label: ROLE_LABELS.LEADER }]} />
+          <Form.Item
+            name="role"
+            label="业务角色"
+            rules={[{ required: true, message: '请选择角色' }]}
+            extra="附属教练需先加入团队"
+          >
+            <Select
+              options={(['LEADER', 'COACH'] as MemberRole[]).map((roleValue) => ({
+                value: roleValue,
+                label: ROLE_LABELS[roleValue],
+              }))}
+            />
           </Form.Item>
           <Form.Item name="defaultSlot" label="默认批阅槽位（1-10，可留空）">
             <InputNumber min={1} max={10} style={{ width: '100%' }} />

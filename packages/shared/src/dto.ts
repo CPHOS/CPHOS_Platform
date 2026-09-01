@@ -25,6 +25,9 @@ export interface UserDto {
     role: MemberRole;
     defaultSlot: number | null;
     uploadLimit: number;
+    teamId: string | null;
+    teamName: string | null;
+    teamUploadLimit: number | null;
   } | null;
 }
 
@@ -101,6 +104,13 @@ export interface AuditLogDto {
   createdAt: string;
 }
 
+export interface AuditLogListDto {
+  items: AuditLogDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface SchoolDto {
   id: string;
   name: string;
@@ -108,7 +118,7 @@ export interface SchoolDto {
   areaName: string | null;
 }
 
-// ---------- 成员与账号管理（功能块③） ----------
+// ---------- 成员与账号管理 ----------
 
 export interface MemberDto {
   userId: string;
@@ -118,6 +128,8 @@ export interface MemberDto {
   role: MemberRole;
   defaultSlot: number | null;
   uploadLimit: number;
+  teamId: string | null;
+  teamName: string | null;
   account: { email: string | null; loginName: string | null; status: UserStatus };
 }
 
@@ -126,6 +138,17 @@ export interface MemberListDto {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** 团队成员选项 / 团队管理批量选人使用 */
+export interface MemberOptionDto {
+  userId: string;
+  realName: string | null;
+  schoolName: string | null;
+  role: MemberRole;
+  teamId: string | null;
+  teamName: string | null;
+  account: { email: string | null; loginName: string | null };
 }
 
 export interface AccountDto {
@@ -145,4 +168,57 @@ export interface AccountListDto {
   total: number;
   page: number;
   pageSize: number;
+}
+
+// ---------- 团队 ----------
+
+export interface TeamMemberDto {
+  userId: string;
+  realName: string | null;
+  schoolName: string | null;
+  role: MemberRole;
+  defaultSlot: number | null;
+  /** 成员在团队内的分工说明或原名（当前为真实姓名，保留扩展位） */
+  account: { email: string | null; loginName: string | null };
+}
+
+export interface TeamDto {
+  id: string;
+  name: string;
+  uploadLimit: number;
+  leaderUserId: string;
+  leaderName: string | null;
+  memberCount: number;
+  members: TeamMemberDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamListDto {
+  items: TeamDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ---------- 字典管理 ----------
+
+export interface AreaDto {
+  id: string;
+  name: string;
+  /** 该赛区下学校数（后台展示；查询时聚合） */
+  schoolCount: number;
+}
+
+export interface NameDictDto {
+  id: string;
+  name: string;
+}
+
+export interface DictBundleDto {
+  areas: AreaDto[];
+  schools: SchoolDto[];
+  grades: NameDictDto[];
+  prizes: NameDictDto[];
+  topics: NameDictDto[];
 }

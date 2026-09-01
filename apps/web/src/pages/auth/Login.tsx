@@ -53,6 +53,9 @@ export function LoginPage() {
           <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password prefix={<LockOutlined />} placeholder="密码" autoComplete="current-password" />
           </Form.Item>
+          <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 12 }}>
+            <Link to="/forgot-password">忘记密码？</Link>
+          </div>
           <Form.Item>
             <Button type="primary" htmlType="submit" block loading={submitting}>
               登录

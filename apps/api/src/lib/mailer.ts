@@ -38,6 +38,9 @@ export async function sendMail(payload: MailPayload): Promise<void> {
     await t.sendMail({ from: env.SMTP_FROM, ...payload });
     return;
   }
+  if (env.NODE_ENV === 'production') {
+    throw new Error('[mailer] 生产环境未配置 SMTP，拒绝把验证码写入本地文件');
+  }
   const dir = path.resolve(process.cwd(), '.devmail');
   fs.mkdirSync(dir, { recursive: true });
   const safe = payload.to.replace(/[^a-zA-Z0-9@._-]/g, '_');

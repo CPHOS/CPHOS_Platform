@@ -1,7 +1,7 @@
 import type {
   AuditApplicationDto,
   AuditApplicationListDto,
-  AuditLogDto,
+  AuditLogListDto,
   LegacyMemberCandidateDto,
   ReviewDecisionInput,
 } from '@cphos/shared';
@@ -29,8 +29,11 @@ export const adminAuditApi = {
   review: (id: string, input: ReviewDecisionInput) =>
     http.post<AuditApplicationDto>(`/admin/audit/applications/${id}/review`, input).then((r) => r.data),
 
-  logs: (params: { applicationId?: string; page?: number; pageSize?: number }) =>
-    http
-      .get<{ items: AuditLogDto[]; total: number }>('/admin/audit/logs', { params })
-      .then((r) => r.data),
+  logs: (params: {
+    applicationId?: string;
+    action?: string;
+    q?: string;
+    page?: number;
+    pageSize?: number;
+  }) => http.get<AuditLogListDto>('/admin/audit/logs', { params }).then((r) => r.data),
 };

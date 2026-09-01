@@ -17,6 +17,14 @@
     "api:migrate": "pnpm --filter @cphos/api prisma:migrate",
     "api:init-super-admin": "pnpm --filter @cphos/api init-super-admin",
     "api:create-internal": "pnpm --filter @cphos/api create-internal",
-    "api:seed-dev": "pnpm --filter @cphos/api seed:dev"
+    "api:seed-dev": "pnpm --filter @cphos/api seed:dev",
+    "api:seed-e2e": "pnpm --filter @cphos/api seed:e2e",
+    "e2e": "node e2e/run.mjs",
+    "e2e:headed": "node e2e/run.mjs --headed",
+    "e2e:debug": "node e2e/run.mjs --debug",
+    "e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

@@ -51,7 +51,10 @@ http.interceptors.response.use(
         config.headers.Authorization = `Bearer ${token}`;
         return http(config);
       } catch {
-        // 刷新失败（未登录/过期）→ 交由页面跳转登录
+        setAccessToken(null);
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.assign('/login');
+        }
       }
     }
     return Promise.reject(error);

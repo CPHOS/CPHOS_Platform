@@ -6,14 +6,14 @@ import type {
   ReviewDecisionInput,
   SubmitApplicationInput,
 } from '@cphos/shared';
-import type { AuditApplication, LegacyMemberRef } from '@prisma/client';
+import type { AuditAction, AuditApplication, LegacyMemberRef } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { Errors } from '../../lib/errors.js';
 
-/** 旧库"个人"学校 id（特殊条目，个人参赛者 uploadLimit 默认 1） */
-const INDIVIDUAL_SCHOOL_ID = 134n;
-/** 普通用户上传限额默认值（旧平台默认 100） */
+/** 个人参赛者学校名称（个人学校 uploadLimit 默认 1） */
+const INDIVIDUAL_SCHOOL_NAME = '个人';
+/** 普通用户上传限额默认值（业务默认 100） */
 const DEFAULT_UPLOAD_LIMIT = 100;
 
 // ---------- 用户（申请归属）include ----------
@@ -90,6 +90,15 @@ async function assertPendingUser(userId: bigint): Promise<void> {
   if (user.status !== 'PENDING') throw Errors.validation('当前账号已通过审核，无需重复提交资料');
 }
 
+async function assertSchoolExists(schoolId: bigint): Promise<void> {
+  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true } });
+  if (!school) throw Errors.validation('所选学校不存在，请重新选择');
+}
+
+function isForeignKeyError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003';
+}
+
 export async function submitApplication(
   userId: bigint,
   input: SubmitApplicationInput,
@@ -99,19 +108,27 @@ export async function submitApplication(
   const latest = await latestApplication(userId);
   if (latest?.status === 'PENDING') throw Errors.applicationExists();
 
-  const app = await prisma.auditApplication.create({
-    data: {
-      userId,
-      realName: input.realName,
-      schoolId: BigInt(input.schoolId),
-      wechatNickname: input.wechatNickname,
-      contact: input.contact,
-      applyNote: input.applyNote ?? null,
-      claimLegacy: input.claimLegacy,
-    },
-    include: { user: APPLICATION_USER_SELECT },
-  });
-  return toDtoWithSchool(app);
+  const schoolId = BigInt(input.schoolId);
+  await assertSchoolExists(schoolId);
+
+  try {
+    const app = await prisma.auditApplication.create({
+      data: {
+        userId,
+        realName: input.realName,
+        schoolId,
+        wechatNickname: input.wechatNickname,
+        contact: input.contact,
+        applyNote: input.applyNote ?? null,
+        claimLegacy: input.claimLegacy,
+      },
+      include: { user: APPLICATION_USER_SELECT },
+    });
+    return toDtoWithSchool(app);
+  } catch (err) {
+    if (isForeignKeyError(err)) throw Errors.validation('所选学校不存在，请重新选择');
+    throw err;
+  }
 }
 
 export async function updateApplication(
@@ -127,25 +144,47 @@ export async function updateApplication(
     latest.status === 'REJECTED' || (latest.status === 'PENDING' && latest.materialRequestedAt !== null);
   if (!editable) throw Errors.applicationNotEditable();
 
-  const app = await prisma.auditApplication.update({
-    where: { id: latest.id },
-    data: {
-      realName: input.realName,
-      schoolId: BigInt(input.schoolId),
-      wechatNickname: input.wechatNickname,
-      contact: input.contact,
-      applyNote: input.applyNote ?? null,
-      claimLegacy: input.claimLegacy,
-      status: 'PENDING',
-      reviewRemark: null,
-      reviewedAt: null,
-      reviewerId: null,
-      matchedLegacyMemberId: null,
-      materialRequestedAt: null,
-    },
-    include: { user: APPLICATION_USER_SELECT },
-  });
-  return toDtoWithSchool(app);
+  const schoolId = BigInt(input.schoolId);
+  await assertSchoolExists(schoolId);
+
+  try {
+    const app = await prisma.$transaction(async (tx) => {
+      // 条件更新：以读取到的状态/材料标记作为乐观锁，防止用户重提与管理员审核并发时
+      // 把已经 APPROVED 的申请覆盖回 PENDING（状态机丢失更新）。
+      const transitioned = await tx.auditApplication.updateMany({
+        where: {
+          id: latest.id,
+          userId,
+          status: latest.status,
+          materialRequestedAt: latest.materialRequestedAt,
+        },
+        data: {
+          realName: input.realName,
+          schoolId,
+          wechatNickname: input.wechatNickname,
+          contact: input.contact,
+          applyNote: input.applyNote ?? null,
+          claimLegacy: input.claimLegacy,
+          status: 'PENDING',
+          reviewRemark: null,
+          reviewedAt: null,
+          reviewerId: null,
+          matchedLegacyMemberId: null,
+          materialRequestedAt: null,
+        },
+      });
+      if (transitioned.count !== 1) throw Errors.applicationNotEditable();
+
+      return tx.auditApplication.findUniqueOrThrow({
+        where: { id: latest.id },
+        include: { user: APPLICATION_USER_SELECT },
+      });
+    });
+    return toDtoWithSchool(app);
+  } catch (err) {
+    if (isForeignKeyError(err)) throw Errors.validation('所选学校不存在，请重新选择');
+    throw err;
+  }
 }
 
 export async function getMyApplication(userId: bigint): Promise<AuditApplicationDto | null> {
@@ -287,8 +326,12 @@ export async function review(
         }
 
         const schoolId = app.schoolId;
+        const school = schoolId
+          ? await tx.school.findUnique({ where: { id: schoolId }, select: { name: true } })
+          : null;
         const uploadLimit =
-          decision.uploadLimit ?? (schoolId === INDIVIDUAL_SCHOOL_ID ? 1 : DEFAULT_UPLOAD_LIMIT);
+          decision.uploadLimit ??
+          (school?.name === INDIVIDUAL_SCHOOL_NAME ? 1 : DEFAULT_UPLOAD_LIMIT);
 
         // 原子抢占：仅首个事务能将 PENDING 流转，避免并发双重审批（updateMany 条件更新）
         const transitioned = await tx.auditApplication.updateMany({
@@ -325,11 +368,24 @@ export async function review(
           },
         });
 
+        const targetUser = await tx.userAccount.findUnique({
+          where: { id: app.userId },
+          select: { status: true },
+        });
+        if (!targetUser) throw Errors.notFound('用户');
+        if (targetUser.status === 'DISABLED') {
+          throw Errors.validation('该用户已被禁用，请先解禁/复核后再通过审核');
+        }
+
         try {
-          await tx.userAccount.update({
-            where: { id: app.userId },
+          // 条件更新：若用户已被并发禁用，则拒绝审核通过
+          const activated = await tx.userAccount.updateMany({
+            where: { id: app.userId, status: { not: 'DISABLED' } },
             data: { status: 'ACTIVE', legacyMemberId: legacyMemberId ?? undefined },
           });
+          if (activated.count !== 1) {
+            throw Errors.validation('该用户已被禁用，请先解禁/复核后再通过审核');
+          }
         } catch (err) {
           // 并发下唯一约束兜底：同一旧账号被并发认领 → 409
           if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -381,6 +437,9 @@ export async function review(
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw Errors.legacyAlreadyClaimed();
     }
+    if (isForeignKeyError(err)) {
+      throw Errors.validation('申请中的学校已不存在，请要求用户重新提交资料');
+    }
     throw err;
   }
 
@@ -391,11 +450,24 @@ export async function review(
 
 export async function listLogs(options: {
   applicationId?: bigint;
+  action?: AuditAction;
+  q?: string;
   page: number;
   pageSize: number;
 }): Promise<{ items: AuditLogDto[]; total: number; page: number; pageSize: number }> {
-  const { applicationId, page, pageSize } = options;
-  const where = applicationId ? { applicationId } : {};
+  const { applicationId, action, q, page, pageSize } = options;
+  const where: Prisma.AuditLogWhereInput = {
+    ...(applicationId ? { applicationId } : {}),
+    ...(action ? { action } : {}),
+    ...(q
+      ? {
+          OR: [
+            { remark: { contains: q } },
+            ...(/^\d+$/.test(q) ? [{ operatorId: BigInt(q) }, { targetUserId: BigInt(q) }] : []),
+          ],
+        }
+      : {}),
+  };
 
   const [total, rows] = await Promise.all([
     prisma.auditLog.count({ where }),

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ACCOUNT_ROLES,
+  AUDIT_ACTIONS,
   AUDIT_STATUSES,
   EMAIL_CODE_PURPOSES,
   MEMBER_ROLES,
@@ -47,10 +48,47 @@ export const sendCodeSchema = z.object({
 });
 export type SendCodeInput = z.infer<typeof sendCodeSchema>;
 
+// ---------- 账号安全 ----------
+
+/** 忘记密码：只填邮箱，若存在则发送重置验证码（不暴露邮箱是否注册） */
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+/** 使用邮箱验证码重置密码 */
+export const resetPasswordSchema = z.object({
+  email: emailSchema,
+  code: codeSchema,
+  newPassword: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/** 登录后修改密码：需校验当前密码 */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, '请输入当前密码').max(72),
+  newPassword: passwordSchema,
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/** 申请换绑邮箱：向新邮箱发送验证码，并再次校验登录密码 */
+export const requestEmailChangeSchema = z.object({
+  newEmail: emailSchema,
+  currentPassword: z.string().min(1, '请输入当前密码').max(72),
+});
+export type RequestEmailChangeInput = z.infer<typeof requestEmailChangeSchema>;
+
+/** 确认换绑邮箱 */
+export const confirmEmailChangeSchema = z.object({
+  newEmail: emailSchema,
+  code: codeSchema,
+});
+export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;
+
 // ---------- 审核与认领 ----------
 
 /** 数字 ID（BigInt 主键经 JSON 序列化为字符串） */
-export const idSchema = z.string().trim().regex(/^\d+$/, '参数不合法');
+export const idSchema = z.string().trim().max(18, '参数不合法').regex(/^\d+$/, '参数不合法');
 
 /** 提交审核资料：必填 姓名/学校/原微信昵称/联系方式；选填 说明/认领（材料上传暂缓） */
 export const submitApplicationSchema = z.object({
@@ -76,12 +114,21 @@ export type ReviewDecisionInput = z.infer<typeof reviewDecisionSchema>;
 export const listApplicationsQuerySchema = z.object({
   status: z.enum(AUDIT_STATUSES).optional(),
   q: z.string().trim().max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListApplicationsQuery = z.infer<typeof listApplicationsQuerySchema>;
 
-// ---------- 成员与账号管理（功能块③） ----------
+export const listAuditLogsQuerySchema = z.object({
+  action: z.enum(AUDIT_ACTIONS).optional(),
+  q: z.string().trim().max(100).optional(),
+  applicationId: idSchema.optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListAuditLogsQuery = z.infer<typeof listAuditLogsQuerySchema>;
+
+// ---------- 成员与账号管理 ----------
 
 /** 创建内部账号（CPHOS_MEMBER，用户名+显示名+密码，不依赖邮箱） */
 export const createInternalSchema = z.object({
@@ -122,7 +169,7 @@ export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export const listMembersQuerySchema = z.object({
   role: z.enum(MEMBER_ROLES).optional(),
   q: z.string().trim().max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListMembersQuery = z.infer<typeof listMembersQuerySchema>;
@@ -131,7 +178,63 @@ export const listAccountsQuerySchema = z.object({
   role: z.enum(ACCOUNT_ROLES).optional(),
   status: z.enum(USER_STATUSES).optional(),
   q: z.string().trim().max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListAccountsQuery = z.infer<typeof listAccountsQuerySchema>;
+
+// ---------- 团队 ----------
+
+export const createTeamSchema = z.object({
+  name: z.string().trim().min(1, '请输入团队名称').max(50, '团队名称过长'),
+  uploadLimit: z.number().int().min(0).max(60000).default(100),
+  leaderUserId: idSchema,
+  memberUserIds: z.array(idSchema).max(200).default([]),
+});
+export type CreateTeamInput = z.infer<typeof createTeamSchema>;
+
+export const updateTeamSchema = z
+  .object({
+    name: z.string().trim().min(1, '请输入团队名称').max(50, '团队名称过长').optional(),
+    uploadLimit: z.number().int().min(0).max(60000).optional(),
+    leaderUserId: idSchema.optional(),
+  })
+  .refine((v) => v.name !== undefined || v.uploadLimit !== undefined || v.leaderUserId !== undefined, {
+    message: '没有需要更新的内容',
+  });
+export type UpdateTeamInput = z.infer<typeof updateTeamSchema>;
+
+export const teamMembersSchema = z.object({
+  userIds: z.array(idSchema).min(1, '请选择成员').max(200),
+});
+export type TeamMembersInput = z.infer<typeof teamMembersSchema>;
+
+export const listTeamsQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListTeamsQuery = z.infer<typeof listTeamsQuerySchema>;
+
+// ---------- 字典管理 ----------
+
+/** 名称字典（赛区 / 年级 / 奖项 / 题号） */
+export const dictNameSchema = z.object({
+  name: z.string().trim().min(1, '请输入名称').max(100, '名称过长'),
+});
+export type DictNameInput = z.infer<typeof dictNameSchema>;
+
+/** 学校：名称 + 所属赛区 */
+export const schoolInputSchema = z.object({
+  name: z.string().trim().min(1, '请输入学校名称').max(100, '学校名称过长'),
+  areaId: idSchema,
+});
+export type SchoolInput = z.infer<typeof schoolInputSchema>;
+
+export const updateSchoolSchema = z
+  .object({
+    name: z.string().trim().min(1, '请输入学校名称').max(100, '学校名称过长').optional(),
+    areaId: idSchema.optional(),
+  })
+  .refine((v) => v.name !== undefined || v.areaId !== undefined, { message: '没有需要更新的内容' });
+export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>;

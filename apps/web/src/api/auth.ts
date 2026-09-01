@@ -17,4 +17,19 @@ export const authApi = {
   logout: () => http.post<MessageResponse>('/auth/logout', {}, { withCredentials: true }),
 
   me: () => http.get<UserDto>('/auth/me').then((r) => r.data),
+
+  forgotPassword: (input: { email: string }) =>
+    http.post<MessageResponse>('/auth/password/forgot', input).then((r) => r.data),
+
+  resetPassword: (input: { email: string; code: string; newPassword: string }) =>
+    http.post<MessageResponse>('/auth/password/reset', input).then((r) => r.data),
+
+  changePassword: (input: { currentPassword: string; newPassword: string }) =>
+    http.post<MessageResponse>('/auth/password/change', input).then((r) => r.data),
+
+  requestEmailChange: (input: { newEmail: string; currentPassword: string }) =>
+    http.post<MessageResponse>('/auth/email/change/request', input).then((r) => r.data),
+
+  confirmEmailChange: (input: { newEmail: string; code: string }) =>
+    http.post<UserDto>('/auth/email/change/confirm', input).then((r) => r.data),
 };

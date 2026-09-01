@@ -16,6 +16,7 @@ import {
   InputNumber,
   List,
   Modal,
+  Result,
   Space,
   Tag,
   Typography,
@@ -51,13 +52,17 @@ export function AuditDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [approveForm] = Form.useForm<ApproveForm>();
 
-  const { data: app, isLoading } = useQuery({
+  const { data: app, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'audit', 'application', id],
     queryFn: () => adminAuditApi.get(id),
     enabled: !!id,
   });
 
-  const { data: candidates = [] } = useQuery({
+  const {
+    data: candidates = [],
+    isError: candidatesError,
+    refetch: refetchCandidates,
+  } = useQuery({
     queryKey: ['admin', 'audit', 'candidates', id],
     queryFn: () => adminAuditApi.candidates(id),
     enabled: !!id && !!app?.claimLegacy,
@@ -83,8 +88,25 @@ export function AuditDetail() {
     }
   };
 
-  if (isLoading || !app) {
+  if (isLoading) {
     return <Card loading />;
+  }
+  if (isError || !app) {
+    return (
+      <Result
+        status="error"
+        title="无法加载该审核申请"
+        subTitle="申请不存在、无权限或网络异常。"
+        extra={[
+          <Button key="retry" type="primary" onClick={() => void refetch()}>
+            重试
+          </Button>,
+          <Button key="back" onClick={() => navigate('/admin/audit')}>
+            返回列表
+          </Button>,
+        ]}
+      />
+    );
   }
 
   const pending = app.status === 'PENDING';
@@ -136,7 +158,18 @@ export function AuditDetail() {
 
       {app.claimLegacy && (
         <Card title="老用户认领候选">
-          {candidates.length === 0 ? (
+          {candidatesError ? (
+            <Result
+              status="warning"
+              title="候选加载失败"
+              subTitle="无法确认是否存在可认领的旧账号，请先重试，避免误通过导致无法再绑定。"
+              extra={
+                <Button type="primary" onClick={() => void refetchCandidates()}>
+                  重新加载候选
+                </Button>
+              }
+            />
+          ) : candidates.length === 0 ? (
             <Empty description="未匹配到旧平台用户候选" />
           ) : (
             <List<LegacyMemberCandidateDto>

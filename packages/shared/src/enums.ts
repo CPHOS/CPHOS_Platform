@@ -49,6 +49,53 @@ export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   DISABLED: '已禁用',
 };
 
+/**
+ * 审计动作（与 Prisma AuditAction 一致）。
+ * 这里只维护展示枚举，不参与数据库；后端负责写入对应值。
+ */
+export const AUDIT_ACTIONS = [
+  'APPROVE',
+  'REJECT',
+  'BIND_LEGACY',
+  'REQUEST_MATERIAL',
+  'UNBIND',
+  'CREATE_ACCOUNT',
+  'ROLE_CHANGE',
+  'STATUS_CHANGE',
+  'MEMBER_UPDATE',
+  'TEAM_CREATE',
+  'TEAM_UPDATE',
+  'TEAM_DELETE',
+] as const;
+export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
+
+export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
+  APPROVE: '审核通过',
+  REJECT: '审核驳回',
+  BIND_LEGACY: '认领绑定',
+  REQUEST_MATERIAL: '要求补材料',
+  UNBIND: '解绑/回退',
+  CREATE_ACCOUNT: '创建账号',
+  ROLE_CHANGE: '账号角色变更',
+  STATUS_CHANGE: '账号状态变更',
+  MEMBER_UPDATE: '成员资料修改',
+  TEAM_CREATE: '创建团队',
+  TEAM_UPDATE: '更新团队',
+  TEAM_DELETE: '删除团队',
+};
+
+/** 字典类型（后台维护页签） */
+export const DICT_KINDS = ['areas', 'schools', 'grades', 'prizes', 'topics'] as const;
+export type DictKind = (typeof DICT_KINDS)[number];
+
+export const DICT_KIND_LABELS: Record<DictKind, string> = {
+  areas: '赛区',
+  schools: '学校',
+  grades: '年级',
+  prizes: '奖项',
+  topics: '题号',
+};
+
 /** API 错误码（稳定契约，前端据此处理） */
 export const ERROR_CODES = {
   VALIDATION: 'VALIDATION',
@@ -68,5 +115,6 @@ export const ERROR_CODES = {
   APPLICATION_NOT_EDITABLE: 'APPLICATION_NOT_EDITABLE',
   ALREADY_REVIEWED: 'ALREADY_REVIEWED',
   LEGACY_ALREADY_CLAIMED: 'LEGACY_ALREADY_CLAIMED',
+  DICT_IN_USE: 'DICT_IN_USE',
 } as const;
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

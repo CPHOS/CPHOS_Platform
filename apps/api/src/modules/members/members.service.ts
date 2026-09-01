@@ -8,7 +8,7 @@ import type {
   MemberListDto,
   UpdateMemberInput,
 } from '@cphos/shared';
-import type { MemberProfile, School, UserAccount, UserStatus } from '@prisma/client';
+import type { MemberProfile, School, Team, UserAccount, UserStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { Errors } from '../../lib/errors.js';
@@ -18,11 +18,13 @@ import { hashPassword } from '../../lib/password.js';
 
 const MEMBER_INCLUDE = {
   school: true,
+  team: true,
   user: { select: { email: true, loginName: true, status: true } },
 } as const;
 
 type MemberWithRelations = MemberProfile & {
   school: School | null;
+  team: Team | null;
   user: { email: string | null; loginName: string | null; status: UserStatus };
 };
 
@@ -45,6 +47,8 @@ function toMemberDto(m: MemberWithRelations): MemberDto {
     role: m.role,
     defaultSlot: m.defaultSlot,
     uploadLimit: m.uploadLimit,
+    teamId: m.teamId === null ? null : String(m.teamId),
+    teamName: m.team?.name ?? null,
     account: { email: m.user.email, loginName: m.user.loginName, status: m.user.status },
   };
 }
@@ -115,9 +119,9 @@ export async function updateMember(
   const current = await prisma.memberProfile.findUnique({ where: { userId } });
   if (!current) throw Errors.notFound('成员');
 
-  // TODO(Q3 团队模型)：TEAM 定案前暂不支持附属教练，避免产生无归属的 COACH
-  if (input.role === 'COACH') {
-    throw Errors.validation('附属教练需绑定团队，团队功能尚未上线，暂不支持');
+  // 附属教练必须归属某个团队；团队模型已上线，未入团队前不允许切换
+  if (input.role === 'COACH' && current.teamId === null) {
+    throw Errors.validation('附属教练需先加入团队');
   }
 
   if (input.role && input.role !== current.role) {
@@ -278,20 +282,39 @@ export async function setAccountStatus(
     const operator = await prisma.userAccount.findUnique({ where: { id: operatorId } });
     if (!operator || operator.role !== 'SUPER_ADMIN') throw Errors.forbidden();
   }
+  // 平台用户必须走审核通过，不能用状态接口直接启用成无档案账号
+  if (status === 'ACTIVE' && target.role === 'PLATFORM_USER') {
+    const approved = await prisma.auditApplication.findFirst({
+      where: { userId: id, status: 'APPROVED' },
+      select: { id: true },
+    });
+    if (!approved) throw Errors.validation('平台用户须先通过审核，不能直接启用');
+  }
 
-  const account = await prisma.userAccount.update({
-    where: { id },
-    data: { status },
-    include: ACCOUNT_INCLUDE,
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      operatorId,
-      action: 'STATUS_CHANGE',
-      targetUserId: id,
-      remark: status === 'ACTIVE' ? '启用' : '禁用',
-    },
+  const account = await prisma.$transaction(async (tx) => {
+    const updated = await tx.userAccount.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === 'DISABLED' ? { tokenVersion: { increment: 1 } } : {}),
+      },
+      include: ACCOUNT_INCLUDE,
+    });
+    if (status === 'DISABLED') {
+      await tx.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+    await tx.auditLog.create({
+      data: {
+        operatorId,
+        action: 'STATUS_CHANGE',
+        targetUserId: id,
+        remark: status === 'ACTIVE' ? '启用' : '禁用',
+      },
+    });
+    return updated;
   });
   return toAccountDto(account);
 }
