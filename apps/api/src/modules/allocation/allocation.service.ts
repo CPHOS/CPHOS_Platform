@@ -307,6 +307,7 @@ export async function listMyMarkingTasks(
             id: true,
             slot: true,
             questionLabel: true,
+            maxScore: true,
             paper: {
               select: {
                 id: true,
@@ -330,6 +331,7 @@ export async function listMyMarkingTasks(
     studentName: task.paperQuestion.paper.student.name,
     slot: task.paperQuestion.slot,
     questionLabel: task.paperQuestion.questionLabel,
+    maxScore: Number(task.paperQuestion.maxScore),
     roundNo: task.roundNo,
     status: task.status,
     score: task.score === null ? null : Number(task.score),

@@ -19,7 +19,7 @@ export type MemberRole = (typeof MEMBER_ROLES)[number];
  * - CPHOS_MEMBER：内部员工，管理员直接建档（不走邮箱注册验证）
  * - PLATFORM_USER：普通用户（教练/个人），仅此角色走邮箱+验证码注册
  */
-export const ACCOUNT_ROLES = ['SUPER_ADMIN', 'ADMIN', 'CPHOS_MEMBER', 'PLATFORM_USER'] as const;
+export const ACCOUNT_ROLES = ['SUPER_ADMIN', 'ADMIN', 'CPHOS_MEMBER', 'PLATFORM_USER', 'BOT'] as const;
 export type AccountRole = (typeof ACCOUNT_ROLES)[number];
 
 export const ACCOUNT_ROLE_LABELS: Record<AccountRole, string> = {
@@ -27,6 +27,7 @@ export const ACCOUNT_ROLE_LABELS: Record<AccountRole, string> = {
   ADMIN: '管理员',
   CPHOS_MEMBER: 'CPHOS 成员',
   PLATFORM_USER: '平台用户',
+  BOT: '机器人账号',
 };
 
 export const AUDIT_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
@@ -81,6 +82,16 @@ export const MARKING_TASK_STATUS_LABELS: Record<MarkingTaskStatus, string> = {
   CANCELED: '已取消',
 };
 
+/** 仲裁任务状态 */
+export const ARBITRATION_STATUSES = ['PENDING', 'CLAIMED', 'COMPLETED', 'CANCELED'] as const;
+export type ArbitrationStatus = (typeof ARBITRATION_STATUSES)[number];
+export const ARBITRATION_STATUS_LABELS: Record<ArbitrationStatus, string> = {
+  PENDING: '待认领',
+  CLAIMED: '仲裁中',
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+};
+
 export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   PENDING: '待审核',
   ACTIVE: '正常',
@@ -120,6 +131,12 @@ export const AUDIT_ACTIONS = [
   'PAPER_ARCHIVE',
   'ALLOCATION_CREATE',
   'ALLOCATION_REVOKE',
+  'BOT_CREATE',
+  'BOT_TOKEN_ROTATE',
+  'MARK_TASK_GRADE',
+  'ARBITRATION_CREATE',
+  'ARBITRATION_CLAIM',
+  'ARBITRATION_GRADE',
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
 
@@ -152,6 +169,12 @@ export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
   PAPER_ARCHIVE: '归档整卷',
   ALLOCATION_CREATE: '创建分配批次',
   ALLOCATION_REVOKE: '撤销分配批次',
+  BOT_CREATE: '创建机器人账号',
+  BOT_TOKEN_ROTATE: '轮换机器人令牌',
+  MARK_TASK_GRADE: '阅卷打分',
+  ARBITRATION_CREATE: '创建仲裁任务',
+  ARBITRATION_CLAIM: '认领仲裁任务',
+  ARBITRATION_GRADE: '仲裁打分',
 };
 
 /** 字典类型（后台维护页签） */

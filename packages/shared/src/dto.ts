@@ -1,4 +1,4 @@
-import type { AccountRole, AllocationStatus, AuditStatus, ExamStatus, MarkingTaskStatus, MemberRole, PaperStatus, UserStatus } from './enums.js';
+import type { AccountRole, AllocationStatus, ArbitrationStatus, AuditStatus, ExamStatus, MarkingTaskStatus, MemberRole, PaperStatus, UserStatus } from './enums.js';
 
 /** 当前登录用户（/api/auth/me 返回，BigInt 序列化为字符串） */
 export interface UserDto {
@@ -342,6 +342,8 @@ export interface PaperDto {
   uploadedById: string;
   uploadedByName: string | null;
   status: PaperStatus;
+  score: number | null;
+  finalizedAt: string | null;
   pages: PaperPageDto[];
   questions: PaperQuestionDto[];
   createdAt: string;
@@ -414,6 +416,7 @@ export interface MarkingTaskDto {
   studentName: string;
   slot: number;
   questionLabel: string | null;
+  maxScore: number;
   roundNo: number;
   status: MarkingTaskStatus;
   score: number | null;
@@ -427,4 +430,37 @@ export interface MarkingTaskListDto {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface ArbitrationDto {
+  id: string;
+  paperQuestionId: string;
+  paperId: string;
+  examId: string;
+  examName: string;
+  studentName: string;
+  slot: number;
+  questionLabel: string | null;
+  maxScore: number;
+  status: ArbitrationStatus;
+  claimedById: string | null;
+  claimedByName: string | null;
+  score: number | null;
+  roundScores: (number | null)[];
+  remark: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ArbitrationListDto {
+  items: ArbitrationDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** 创建机器人账号返回一次性明文令牌 */
+export interface BotCreatedDto {
+  account: AccountDto;
+  token: string;
 }

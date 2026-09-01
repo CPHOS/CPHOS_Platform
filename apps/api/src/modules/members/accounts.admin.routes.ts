@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  createBotSchema,
   createInternalSchema,
   idSchema,
   listAccountsQuerySchema,
@@ -7,8 +8,10 @@ import {
   setAccountStatusSchema,
 } from '@cphos/shared';
 import {
+  createBotAccount,
   createInternalAccount,
   listAccounts,
+  rotateBotToken,
   setAccountRole,
   setAccountStatus,
 } from './members.service.js';
@@ -27,6 +30,17 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
     const input = createInternalSchema.parse(req.body);
     const result = await createInternalAccount(input, BigInt(req.user.sub));
     return reply.code(201).send(result);
+  });
+
+  app.post('/accounts/bots', { onRequest: adminGuard }, async (req, reply) => {
+    const input = createBotSchema.parse(req.body);
+    const result = await createBotAccount(input, BigInt(req.user.sub));
+    return reply.code(201).send(result);
+  });
+
+  app.post('/accounts/:id/bot-token', { onRequest: adminGuard }, async (req) => {
+    const { id } = req.params as { id: string };
+    return rotateBotToken(BigInt(idSchema.parse(id)), BigInt(req.user.sub));
   });
 
   app.post('/accounts/:id/role', { onRequest: superGuard }, async (req) => {

@@ -23,6 +23,11 @@ export function generateRefreshToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
+/** 机器人一次性/可轮换 API 令牌 */
+export function generateBotToken(): string {
+  return 'bot_' + randomBytes(32).toString('base64url');
+}
+
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }

@@ -1,6 +1,8 @@
 import type {
   AccountDto,
   AccountListDto,
+  BotCreatedDto,
+  CreateBotInput,
   CreateInternalInput,
   ListAccountsQuery,
   ListMembersQuery,
@@ -13,6 +15,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { Errors } from '../../lib/errors.js';
 import { hashPassword } from '../../lib/password.js';
+import { generateBotToken, hashToken } from '../../lib/security.js';
 
 // ---------- include ----------
 
@@ -263,6 +266,67 @@ export async function setAccountRole(
     },
   });
   return toAccountDto(account);
+}
+
+
+export async function createBotAccount(
+  input: CreateBotInput,
+  operatorId: bigint,
+): Promise<BotCreatedDto> {
+  const loginName = input.loginName.trim().toLowerCase();
+  const existing = await prisma.userAccount.findUnique({ where: { loginName } });
+  if (existing) throw Errors.validation('该用户名已存在');
+
+  const token = generateBotToken();
+  const account = await prisma.$transaction(async (tx) => {
+    const created = await tx.userAccount.create({
+      data: {
+        loginName,
+        displayName: input.displayName,
+        role: 'BOT',
+        status: 'ACTIVE',
+        botTokenHash: hashToken(token),
+        botTokenCreatedAt: new Date(),
+      },
+      include: ACCOUNT_INCLUDE,
+    });
+    await tx.auditLog.create({
+      data: {
+        operatorId,
+        action: 'BOT_CREATE',
+        targetUserId: created.id,
+        remark: '创建机器人账号 ' + loginName,
+      },
+    });
+    return created;
+  });
+  return { account: toAccountDto(account), token };
+}
+
+export async function rotateBotToken(id: bigint, operatorId: bigint): Promise<BotCreatedDto> {
+  const target = await prisma.userAccount.findUnique({ where: { id } });
+  if (!target) throw Errors.notFound('账号');
+  if (target.role !== 'BOT') throw Errors.validation('仅机器人账号可轮换令牌');
+  if (target.status === 'DISABLED') throw Errors.validation('机器人账号已禁用');
+
+  const token = generateBotToken();
+  const account = await prisma.$transaction(async (tx) => {
+    const updated = await tx.userAccount.update({
+      where: { id },
+      data: { botTokenHash: hashToken(token), botTokenCreatedAt: new Date() },
+      include: ACCOUNT_INCLUDE,
+    });
+    await tx.auditLog.create({
+      data: {
+        operatorId,
+        action: 'BOT_TOKEN_ROTATE',
+        targetUserId: id,
+        remark: '轮换机器人令牌',
+      },
+    });
+    return updated;
+  });
+  return { account: toAccountDto(account), token };
 }
 
 export async function setAccountStatus(

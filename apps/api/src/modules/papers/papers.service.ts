@@ -103,6 +103,8 @@ function toPaperDto(paper: PaperWithRelations): PaperDto {
     uploadedById: String(paper.uploadedById),
     uploadedByName: uploadedName(paper),
     status: paper.status,
+    score: paper.score === null ? null : Number(paper.score),
+    finalizedAt: paper.finalizedAt?.toISOString() ?? null,
     pages: paper.pages.map(toPageDto),
     questions: paper.questions.map((q) => toQuestionDto(q, pages)),
     createdAt: paper.createdAt.toISOString(),

@@ -26,6 +26,7 @@ enum AccountRole {
   ADMIN
   CPHOS_MEMBER
   PLATFORM_USER
+  BOT // 机器人/自动化账号
 }
 
 enum EmailCodePurpose {
@@ -69,6 +70,12 @@ enum AuditAction {
   PAPER_ARCHIVE // 归档整卷
   ALLOCATION_CREATE // 创建分配批次
   ALLOCATION_REVOKE // 撤销分配批次
+  BOT_CREATE // 创建机器人账号
+  BOT_TOKEN_ROTATE // 轮换机器人令牌
+  MARK_TASK_GRADE // 阅卷打分
+  ARBITRATION_CREATE // 创建仲裁任务
+  ARBITRATION_CLAIM // 认领仲裁任务
+  ARBITRATION_GRADE // 仲裁打分
 }
 
 enum MemberRole {
@@ -99,6 +106,9 @@ model UserAccount {
   protected           Boolean     @default(false) // 唯一超级管理员：不可删除/禁用/降级
   status              UserStatus  @default(PENDING)
   legacyMemberId      BigInt?     @unique // 认领绑定的旧平台成员 id（单向一次性）
+  // 机器人/自动化账号：哈希存储，不保存明文
+  botTokenHash        String?     @unique
+  botTokenCreatedAt   DateTime?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
@@ -110,6 +120,7 @@ model UserAccount {
   createdExams      Exam[]             @relation("ExamCreator")
   allocationBatches AllocationBatch[]
   markRecords       MarkRecord[]
+  arbitrations      Arbitration[]
 }
 
 model EmailCode {
@@ -323,6 +334,13 @@ enum MarkTaskType {
   ARBITRATION
 }
 
+enum ArbitrationStatus {
+  PENDING
+  CLAIMED
+  COMPLETED
+  CANCELED
+}
+
 model Paper {
   id           BigInt      @id @default(autoincrement())
   examId       BigInt
@@ -332,6 +350,8 @@ model Paper {
   uploadedById BigInt
   uploadedBy   MemberProfile @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   status       PaperStatus @default(UPLOADING)
+  score        Decimal?    @db.Decimal(10, 2)
+  finalizedAt  DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -373,6 +393,7 @@ model PaperQuestion {
 
   images       QuestionImage[]
   markingTasks MarkingTask[]
+  arbitration  Arbitration?
 
   @@unique([paperId, slot])
   @@index([paperId])
@@ -463,6 +484,23 @@ model MarkRecord {
 
   @@index([taskType, taskId])
   @@index([operatorId, createdAt])
+}
+
+model Arbitration {
+  id              BigInt            @id @default(autoincrement())
+  paperQuestionId BigInt            @unique
+  paperQuestion   PaperQuestion     @relation(fields: [paperQuestionId], references: [id], onDelete: Cascade)
+  status          ArbitrationStatus @default(PENDING)
+  claimedById     BigInt?
+  claimedBy       UserAccount?      @relation(fields: [claimedById], references: [id], onDelete: SetNull)
+  score           Decimal?          @db.Decimal(8, 2)
+  remark          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  completedAt     DateTime?
+
+  @@index([status, createdAt])
+  @@index([claimedById])
 }
 
 // ---------- 主数据字典（新系统自增 ID，管理员维护） ----------

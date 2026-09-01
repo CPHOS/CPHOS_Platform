@@ -1,14 +1,19 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MARKING_TASK_STATUS_LABELS, type MarkingTaskDto, type MarkingTaskStatus } from '@cphos/shared';
+import {
+  ARBITRATION_STATUS_LABELS,
+  type ArbitrationDto,
+  type ArbitrationStatus,
+} from '@cphos/shared';
 import { App, Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
-import { tasksApi } from '../../api/allocation';
+import { arbitrationApi } from '../../api/marking';
 import { apiErrorMessage } from '../../api/http';
-import { markingApi } from '../../api/marking';
+import { useAuthStore } from '../../stores/auth';
 
-const STATUS_COLORS: Record<MarkingTaskStatus, string> = {
+const STATUS_COLORS: Record<ArbitrationStatus, string> = {
   PENDING: 'processing',
+  CLAIMED: 'warning',
   COMPLETED: 'success',
   CANCELED: 'default',
 };
@@ -18,25 +23,32 @@ interface GradeForm {
   remark?: string;
 }
 
-/** 平台用户：分配给我的双阅任务与打分 */
-export function TasksPage() {
+export function ArbitrationPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<MarkingTaskStatus | undefined>();
+  const me = useAuthStore((s) => s.user);
+  const [status, setStatus] = useState<ArbitrationStatus | undefined>('PENDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [grading, setGrading] = useState<MarkingTaskDto | null>(null);
+  const [grading, setGrading] = useState<ArbitrationDto | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<GradeForm>();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['tasks', 'mine', status, page, pageSize],
-    queryFn: () => tasksApi.listMine({ status, page, pageSize }),
+    queryKey: ['arbitration', status, page, pageSize],
+    queryFn: () => arbitrationApi.list({ status, page, pageSize }),
   });
 
-  const openGrade = (task: MarkingTaskDto) => {
-    setGrading(task);
-    form.resetFields();
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['arbitration'] });
+
+  const claim = async (task: ArbitrationDto) => {
+    try {
+      await arbitrationApi.claim(task.id);
+      message.success('已认领');
+      refresh();
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    }
   };
 
   const submitGrade = async () => {
@@ -45,10 +57,10 @@ export function TasksPage() {
     if (!values) return;
     setSaving(true);
     try {
-      await markingApi.gradeTask(grading.id, values);
-      message.success('评分已提交');
+      await arbitrationApi.grade(grading.id, values);
+      message.success('仲裁分已提交');
       setGrading(null);
-      void queryClient.invalidateQueries({ queryKey: ['tasks', 'mine'] });
+      refresh();
     } catch (err) {
       message.error(apiErrorMessage(err));
     } finally {
@@ -56,28 +68,41 @@ export function TasksPage() {
     }
   };
 
-  const columns: ColumnsType<MarkingTaskDto> = [
+  const columns: ColumnsType<ArbitrationDto> = [
     { title: '考试', dataIndex: 'examName', ellipsis: true },
     { title: '学生', dataIndex: 'studentName', ellipsis: true },
     { title: '题目', render: (_, r) => '槽位 ' + r.slot + (r.questionLabel ? '（' + r.questionLabel + '）' : '') },
-    { title: '轮次', dataIndex: 'roundNo', width: 80, render: (v: number) => '第' + v + '阅' },
+    {
+      title: '双阅分',
+      render: (_, r) => r.roundScores.map((score) => score ?? '-').join(' / '),
+      responsive: ['md'],
+    },
     {
       title: '状态',
       dataIndex: 'status',
-      render: (v: MarkingTaskStatus) => <Tag color={STATUS_COLORS[v]}>{MARKING_TASK_STATUS_LABELS[v]}</Tag>,
+      render: (v: ArbitrationStatus) => <Tag color={STATUS_COLORS[v]}>{ARBITRATION_STATUS_LABELS[v]}</Tag>,
     },
-    { title: '满分', dataIndex: 'maxScore', width: 70 },
-    { title: '得分', dataIndex: 'score', width: 70, render: (v: number | null) => v ?? '-' },
+    { title: '仲裁人', dataIndex: 'claimedByName', render: (v: string | null) => v ?? '-', responsive: ['md'] },
+    { title: '仲裁分', dataIndex: 'score', width: 80, render: (v: number | null) => v ?? '-' },
     {
       title: '操作',
-      width: 90,
+      width: 140,
       render: (_, r) =>
-        r.status === 'PENDING' ? (
-          <Button size="small" type="primary" onClick={() => openGrade(r)} data-testid={'task-grade-' + r.id}>
-            打分
-          </Button>
-        ) : (
+        r.status === 'COMPLETED' || r.status === 'CANCELED' ? (
           '-'
+        ) : (
+          <Space size="small">
+            {r.status === 'PENDING' && (
+              <Button size="small" onClick={() => void claim(r)}>
+                认领
+              </Button>
+            )}
+            {!r.claimedById || r.claimedById === me?.id ? (
+              <Button size="small" type="primary" onClick={() => setGrading(r)}>
+                打分
+              </Button>
+            ) : null}
+          </Space>
         ),
     },
   ];
@@ -87,6 +112,8 @@ export function TasksPage() {
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
+          showSearch
+          optionFilterProp="label"
           placeholder="状态"
           style={{ width: 140 }}
           value={status}
@@ -94,14 +121,14 @@ export function TasksPage() {
             setStatus(v);
             setPage(1);
           }}
-          options={(['PENDING', 'COMPLETED', 'CANCELED'] as MarkingTaskStatus[]).map((s) => ({
+          options={(['PENDING', 'CLAIMED', 'COMPLETED', 'CANCELED'] as ArbitrationStatus[]).map((s) => ({
             value: s,
-            label: MARKING_TASK_STATUS_LABELS[s],
+            label: ARBITRATION_STATUS_LABELS[s],
           }))}
         />
-        <span style={{ color: '#888' }}>双阅分差超过考试配置 gap 时将自动生成仲裁任务。</span>
+        <span style={{ color: '#888' }}>CPHOS 成员/管理员/BOT 可认领；完成仲裁后写入最终题分并汇总总分。</span>
       </Space>
-      <Table<MarkingTaskDto>
+      <Table<ArbitrationDto>
         rowKey="id"
         loading={isLoading}
         columns={columns}
@@ -120,7 +147,7 @@ export function TasksPage() {
       />
 
       <Modal
-        title={'题目打分' + (grading ? '（满分 ' + grading.maxScore + '）' : '')}
+        title={'仲裁打分' + (grading ? '（满分 ' + grading.maxScore + '）' : '')}
         open={!!grading}
         onCancel={() => setGrading(null)}
         onOk={() => void submitGrade()}
@@ -128,7 +155,7 @@ export function TasksPage() {
         destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="score" label="得分" rules={[{ required: true, message: '请输入得分' }]}>
+          <Form.Item name="score" label="仲裁分" rules={[{ required: true, message: '请输入仲裁分' }]}>
             <InputNumber min={0} max={grading?.maxScore ?? 10000} step={0.5} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="remark" label="备注（选填）">

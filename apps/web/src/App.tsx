@@ -17,6 +17,7 @@ import { RegisterPage } from './pages/auth/Register';
 import { ForgotPasswordPage } from './pages/auth/ForgotPassword';
 import { VerifyEmailPage } from './pages/auth/VerifyEmail';
 import { CphosHome } from './pages/cphos/Home';
+import { ArbitrationPage } from './pages/cphos/Arbitration';
 import { PlatformHome } from './pages/platform/Home';
 import { ProfilePage } from './pages/Profile';
 import { StudentsPage } from './pages/platform/Students';
@@ -78,6 +79,7 @@ export function App() {
               kind="cphos"
               nav={[
                 { key: '/cphos', label: '工作台', icon: <HomeOutlined /> },
+                { key: '/cphos/arbitration', label: '仲裁任务', icon: <AuditOutlined /> },
                 { key: '/cphos/profile', label: '个人信息', icon: <IdcardOutlined /> },
               ]}
             />
@@ -85,6 +87,7 @@ export function App() {
         }
       >
         <Route index element={<CphosHome />} />
+        <Route path="arbitration" element={<ArbitrationPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

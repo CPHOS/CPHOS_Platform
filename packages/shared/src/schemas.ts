@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ACCOUNT_ROLES,
+  ARBITRATION_STATUSES,
   AUDIT_ACTIONS,
   AUDIT_STATUSES,
   EMAIL_CODE_PURPOSES,
@@ -391,3 +392,37 @@ export const listMarkingTasksQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListMarkingTasksQuery = z.infer<typeof listMarkingTasksQuerySchema>;
+
+// ---------- 考试域：M2-D 阅卷 / 仲裁 / BOT ----------
+
+export const createBotSchema = z.object({
+  loginName: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, '请输入机器人用户名')
+    .max(50, '用户名过长')
+    .regex(/^[a-z0-9._-]+$/, '用户名只能包含小写字母、数字和 . _ -'),
+  displayName: z.string().trim().min(1, '请输入显示名称').max(50, '显示名称过长'),
+});
+export type CreateBotInput = z.infer<typeof createBotSchema>;
+
+export const gradeMarkingTaskSchema = z.object({
+  score: z.number().min(0, '分数不能为负').max(10000, '分数过大'),
+  remark: z.string().trim().max(500, '备注过长').optional(),
+});
+export type GradeMarkingTaskInput = z.infer<typeof gradeMarkingTaskSchema>;
+
+export const gradeArbitrationSchema = z.object({
+  score: z.number().min(0, '分数不能为负').max(10000, '分数过大'),
+  remark: z.string().trim().max(500, '备注过长').optional(),
+});
+export type GradeArbitrationInput = z.infer<typeof gradeArbitrationSchema>;
+
+export const listArbitrationsQuerySchema = z.object({
+  status: z.enum(ARBITRATION_STATUSES).optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListArbitrationsQuery = z.infer<typeof listArbitrationsQuerySchema>;
+
