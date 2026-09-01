@@ -199,6 +199,15 @@ export async function closeExam(id: bigint, operatorId: bigint): Promise<ExamDto
     where: { allocation: { examId: id }, status: 'PENDING' },
   });
   if (pendingTasks > 0) throw Errors.validation('仍有 ' + pendingTasks + ' 个阅卷任务未完成，不能结束考试');
+  const pendingArbitrations = await prisma.arbitration.count({
+    where: {
+      status: { in: ['PENDING', 'CLAIMED'] },
+      paperQuestion: { paper: { examId: id } },
+    },
+  });
+  if (pendingArbitrations > 0) {
+    throw Errors.validation('仍有 ' + pendingArbitrations + ' 个仲裁任务未完成，不能结束考试');
+  }
 
   await prisma.$transaction(async (tx) => {
     const changed = await tx.exam.updateMany({

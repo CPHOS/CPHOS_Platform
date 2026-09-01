@@ -82,7 +82,7 @@ export function ExamsAdminPage() {
     queryFn: () => adminAllocationApi.batches(allocating!.id),
     enabled: !!allocating,
   });
-  const { data: ranking, refetch: refetchRanking } = useQuery({
+  const { data: ranking } = useQuery({
     queryKey: ['admin', 'ranking', rankingExam?.id],
     queryFn: () => rankingApi.get(rankingExam!.id),
     enabled: !!rankingExam,
@@ -189,7 +189,6 @@ export function ExamsAdminPage() {
 
   const openRanking = (exam: ExamDto) => {
     setRankingExam(exam);
-    refetchRanking();
   };
 
   const exportRanking = async (format: 'csv' | 'xlsx') => {
@@ -204,7 +203,7 @@ export function ExamsAdminPage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       message.error(apiErrorMessage(err));
     } finally {
@@ -254,8 +253,8 @@ export function ExamsAdminPage() {
       render: (_, r) => (
         <Space size="small" wrap>
           {r.status === 'DRAFT' && <a onClick={() => openEdit(r)}>编辑</a>}
-          {r.status !== 'ARCHIVED' && <a onClick={() => openConfig(r)}>配置</a>}
-          {r.status !== 'DRAFT' && r.status !== 'ARCHIVED' && <a onClick={() => setAllocating(r)}>分配</a>}
+          {r.status === 'DRAFT' && <a onClick={() => openConfig(r)}>配置</a>}
+          {r.status === 'PUBLISHED' && <a onClick={() => setAllocating(r)}>分配</a>}
           <a onClick={() => openRanking(r)}>排名</a>
           {r.status === 'DRAFT' && (
             <Popconfirm title="发布后教练即可报名，确认发布？" onConfirm={() => void doAction(r, 'publish')}>

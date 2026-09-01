@@ -33,13 +33,14 @@ export const REFRESH_COOKIE = 'cphos_refresh';
 interface JwtPayload {
   sub: string;
   email: string;
+  tv: number;
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const authLimit = { max: 60, timeWindow: '1 minute' };
-  /** 为某个用户签发访问令牌 */
-  const signAccess = (app: FastifyInstance, userId: bigint, email: string | null) =>
-    app.jwt.sign({ sub: String(userId), email });
+  /** 为某个用户签发访问令牌（带 tokenVersion，改密/禁用后立即失效） */
+  const signAccess = (app: FastifyInstance, userId: bigint, email: string | null, tokenVersion: number) =>
+    app.jwt.sign({ sub: String(userId), email, tv: tokenVersion });
 
   const setRefreshCookie = (
     reply: { setCookie: (name: string, value: string, opts: object) => void },
@@ -101,8 +102,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/login', { config: { rateLimit: authLimit } }, async (req, reply) => {
     const input = loginSchema.parse(req.body);
-    const { user, refreshToken } = await login(input);
-    const accessToken = await signAccess(app, BigInt(user.id), user.email);
+    const { user, refreshToken, tokenVersion } = await login(input);
+    const accessToken = await signAccess(app, BigInt(user.id), user.email, tokenVersion);
     setRefreshCookie(reply, refreshToken);
     const body: AuthResponse = { user, accessToken };
     return body;
@@ -111,8 +112,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/refresh', async (req, reply) => {
     const token = req.cookies[REFRESH_COOKIE];
     if (!token) throw Errors.unauthorized();
-    const { user, refreshToken } = await rotateRefreshToken(token);
-    const accessToken = await signAccess(app, BigInt(user.id), user.email);
+    const { user, refreshToken, tokenVersion } = await rotateRefreshToken(token);
+    const accessToken = await signAccess(app, BigInt(user.id), user.email, tokenVersion);
     setRefreshCookie(reply, refreshToken);
     const body: AuthResponse = { user, accessToken };
     return body;

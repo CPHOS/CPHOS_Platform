@@ -8,10 +8,12 @@ import { hashToken } from '../lib/security.js';
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: { sub: string; email: string | null };
+    payload: { sub: string; email: string | null; tv: number };
     user: {
       sub: string;
       email: string | null;
+      /** JWT 会话版本（BOT 认证不存在） */
+      tv?: number;
       /** 授权守卫（authorize）填充，authenticate 阶段不存在 */
       role?: AccountRole;
       status?: UserStatus;
@@ -49,7 +51,14 @@ export const authPlugin = fp(
         return;
       }
       try {
-        await req.jwtVerify();
+        const payload = await req.jwtVerify<{ sub: string; email: string | null; tv: number }>();
+        const user = await prisma.userAccount.findUnique({
+          where: { id: BigInt(payload.sub) },
+          select: { tokenVersion: true, status: true },
+        });
+        if (!user || user.tokenVersion !== payload.tv || user.status === 'DISABLED') {
+          throw Errors.unauthorized();
+        }
       } catch {
         throw Errors.unauthorized();
       }

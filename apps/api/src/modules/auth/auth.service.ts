@@ -446,6 +446,7 @@ export async function login(input: { account: string; password: string }) {
   return {
     user: toUserDto(user),
     refreshToken: await issueRefreshToken(user.id, user.tokenVersion),
+    tokenVersion: user.tokenVersion,
   };
 }
 
@@ -456,8 +457,12 @@ export async function rotateRefreshToken(refreshToken: string) {
   if (!record) throw Errors.unauthorized();
 
   if (record.revokedAt) {
-    // 顺序重放已撤销令牌：按泄露处理，吊销该用户全部会话
-    await prisma.$transaction((tx) => invalidateSessions(record.userId, tx)).catch(() => undefined);
+    // 刚轮换的旧令牌在宽限窗口内的并发重试不按泄露处理；窗口外仍全端吊销
+    const graceMs = env.REFRESH_ROTATION_GRACE_SECONDS * 1000;
+    const rotatedRecently = record.rotatedAt && Date.now() - record.rotatedAt.getTime() < graceMs;
+    if (!rotatedRecently) {
+      await prisma.$transaction((tx) => invalidateSessions(record.userId, tx)).catch(() => undefined);
+    }
     throw Errors.unauthorized();
   }
   if (record.expiresAt.getTime() < Date.now()) throw Errors.unauthorized();
@@ -474,10 +479,14 @@ export async function rotateRefreshToken(refreshToken: string) {
   const claimed = await prisma.$transaction(async (tx) => {
     const result = await tx.refreshToken.updateMany({
       where: { id: record.id, revokedAt: null, tokenVersion: user.tokenVersion },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: new Date(), rotatedAt: new Date() },
     });
     if (result.count !== 1) {
-      await invalidateSessions(user.id, tx);
+      const current = await tx.refreshToken.findUnique({ where: { id: record.id }, select: { rotatedAt: true } });
+      const graceMs = env.REFRESH_ROTATION_GRACE_SECONDS * 1000;
+      if (!current?.rotatedAt || Date.now() - current.rotatedAt.getTime() >= graceMs) {
+        await invalidateSessions(user.id, tx);
+      }
       return false;
     }
     await tx.refreshToken.create({
@@ -492,14 +501,14 @@ export async function rotateRefreshToken(refreshToken: string) {
   });
   if (!claimed) throw Errors.unauthorized();
 
+  const fresh = await prisma.userAccount.findUniqueOrThrow({
+    where: { id: user.id },
+    include: USER_INCLUDE,
+  });
   return {
-    user: toUserDto(
-      await prisma.userAccount.findUniqueOrThrow({
-        where: { id: user.id },
-        include: USER_INCLUDE,
-      }),
-    ),
+    user: toUserDto(fresh),
     refreshToken: newToken,
+    tokenVersion: fresh.tokenVersion,
   };
 }
 

@@ -24,7 +24,7 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
     .then((r: any) => r.json());
   await request.put('/api/admin/exams/' + exam.id + '/config', {
     headers: adminAuth,
-    data: { slotCount: 1, defaultPoint: 10, gap: 20, titleMapping: [] },
+    data: { slotCount: 1, defaultPoint: 10, gap: 1, titleMapping: [] },
   });
   await request.post('/api/admin/exams/' + exam.id + '/publish', { headers: adminAuth, data: {} });
 
@@ -92,18 +92,55 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   expect(revoke.ok()).toBeTruthy();
   const second = await request.post('/api/admin/exams/' + exam.id + '/allocation', { headers: adminAuth, data: {} });
   expect(second.ok()).toBeTruthy();
+  const secondBatch = await second.json();
 
-  // 全部定稿，制造危险姓名
+  // 分差触发仲裁；此时结束考试应被拒绝
   const tasks = await request.get('/api/tasks/mine', { headers: coachAuth }).then((r: any) => r.json());
   const myTasks = tasks.items.filter((t: any) => t.examId === exam.id);
   expect(myTasks.length).toBe(4);
   for (const task of myTasks) {
     const grade = await request.post('/api/tasks/' + task.id + '/grade', {
       headers: coachAuth,
-      data: { score: 10 },
+      data: { score: task.roundNo === 1 ? 5 : 10 },
     });
     expect(grade.ok()).toBeTruthy();
   }
+  const closeBefore = await request.post('/api/admin/exams/' + exam.id + '/close', {
+    headers: adminAuth,
+    data: {},
+  });
+  expect(closeBefore.status()).toBe(400);
+
+  // 完成仲裁定稿；仅保留当前 ACTIVE 批次两轮分数
+  const arbitrations = await request
+    .get('/api/arbitration/tasks', { headers: adminAuth, params: { status: 'PENDING', pageSize: 20 } })
+    .then((r: any) => r.json());
+  const myArbs = arbitrations.items.filter((a: any) => a.examId === exam.id);
+  expect(myArbs.length).toBe(2);
+  for (const arb of myArbs) {
+    const grade = await request.post('/api/arbitration/tasks/' + arb.id + '/grade', {
+      headers: adminAuth,
+      data: { score: 7 },
+    });
+    expect(grade.ok()).toBeTruthy();
+  }
+  for (const paper of papers) {
+    const finalPaper = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());
+    expect(finalPaper.finalizedAt).toBeTruthy();
+    expect(finalPaper.questions[0].roundScores.length).toBe(2);
+  }
+  const closeAfter = await request.post('/api/admin/exams/' + exam.id + '/close', {
+    headers: adminAuth,
+    data: {},
+  });
+  expect(closeAfter.ok()).toBeTruthy();
+
+  // 终审后不得撤销分配改写成绩
+  const revokeFinal = await request.post('/api/admin/allocation/batches/' + secondBatch.id + '/revoke', {
+    headers: adminAuth,
+    data: {},
+  });
+  expect(revokeFinal.status()).toBe(400);
 
   // M5 CSV 公式注入被中和
   const csv = await request.get('/api/admin/exams/' + exam.id + '/ranking/export', {

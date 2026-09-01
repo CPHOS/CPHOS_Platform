@@ -149,6 +149,7 @@ model RefreshToken {
   tokenHash    String      @unique // sha256 存储
   expiresAt    DateTime
   revokedAt    DateTime?
+  rotatedAt    DateTime?
   tokenVersion Int         @default(0) // 签发时的用户会话版本
   createdAt    DateTime    @default(now())
 

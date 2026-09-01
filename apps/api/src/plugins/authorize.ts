@@ -25,6 +25,9 @@ export const authorizePlugin = fp(
         where: { id: BigInt(req.user.sub) },
       });
       if (!user) throw Errors.unauthorized();
+      if (typeof req.user.tv === 'number' && req.user.tv !== user.tokenVersion) {
+        throw Errors.unauthorized();
+      }
       return user;
     };
 

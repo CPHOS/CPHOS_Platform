@@ -61,9 +61,12 @@ pnpm --filter @cphos/api start   # node apps/api/dist/server.js
 生产发布前至少执行：
 
 ```bash
-# 1) 备份数据库与上传目录
+# 1) 读取 apps/api/.env 并备份数据库与上传目录
+set -a; . apps/api/.env; set +a
 pg_dump "$DATABASE_URL" -Fc -f backup-$(date +%F).dump
+tar -C "$(dirname "$UPLOAD_DIR")" -czf uploads-$(date +%F).tgz "$(basename "$UPLOAD_DIR")"
 # 2) 当前按既定决策使用 db push 同步 schema（无迁移历史）；执行前必须可回滚
+#    生产安装需保留 devDependencies 或使用同一 Prisma 版本的 pnpm dlx
 pnpm --filter @cphos/api exec prisma generate
 pnpm --filter @cphos/api exec prisma db push
 # 3) 启动并通过就绪探针

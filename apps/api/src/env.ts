@@ -24,6 +24,7 @@ const schema = z
     JWT_SECRET: z.string().min(16).default(INSECURE_JWT_DEFAULT),
     ACCESS_TOKEN_TTL: z.string().default('15m'),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(30),
+    REFRESH_ROTATION_GRACE_SECONDS: z.coerce.number().default(10),
     CODE_TTL_MINUTES: z.coerce.number().default(10),
     CODE_SALT: z.string().default(INSECURE_CODE_SALT_DEFAULT),
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
@@ -33,6 +34,15 @@ const schema = z
     PAPER_MAX_PAGES: z.coerce.number().default(50),
     BODY_LIMIT_MB: z.coerce.number().default(1),
     TRUST_PROXY: z.preprocess(
+      (v) => (v === undefined ? undefined : v === true || v === 'true' || v === '1'),
+      z.boolean().default(false),
+    ),
+    // 容器/特殊部署需要监听公网时才显式打开
+    ALLOW_PUBLIC_BIND: z.preprocess(
+      (v) => (v === undefined ? undefined : v === true || v === 'true' || v === '1'),
+      z.boolean().default(false),
+    ),
+    ALLOW_INSECURE_HTTP: z.preprocess(
       (v) => (v === undefined ? undefined : v === true || v === 'true' || v === '1'),
       z.boolean().default(false),
     ),
@@ -89,11 +99,27 @@ const schema = z
         message: '生产环境禁止使用开发内嵌数据库默认连接串',
       });
     }
-    if (value.CORS_ORIGIN === DEV_CORS_DEFAULT || value.CORS_ORIGIN.startsWith('http://localhost')) {
+    if (!value.ALLOW_PUBLIC_BIND && (value.HOST === '0.0.0.0' || value.HOST === '::')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['HOST'],
+        message: '生产环境默认必须绑定 127.0.0.1；如确需公网监听请显式设置 ALLOW_PUBLIC_BIND=true',
+      });
+    }
+    const origins = value.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
+    if (
+      origins.length === 0 ||
+      origins.some(
+        (origin) =>
+          (!value.ALLOW_INSECURE_HTTP && !origin.startsWith('https://')) ||
+          /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(origin) ||
+          origin === '*',
+      )
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['CORS_ORIGIN'],
-        message: '生产环境必须显式配置正式前端域名',
+        message: '生产环境 CORS_ORIGIN 必须为逗号分隔的 HTTPS 正式域名，且不能包含 localhost/通配符',
       });
     }
     if (!value.SMTP_FROM || value.SMTP_FROM === DEV_SMTP_FROM) {

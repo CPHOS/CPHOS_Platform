@@ -30,8 +30,8 @@ pnpm api:seed-dev      # 终端 2：开发种子（合成字典，可反复执�
 pnpm dev:api           # 终端 3：API（http://127.0.0.1:3001）
 pnpm dev:web           # 终端 4：前端（http://localhost:5173）
 pnpm e2e               # 本地 E2E（自动拉起服务、复用本机 Edge）
-pnpm api:init-super-admin -- super@example.com <密码>   # 超级管理员（受保护）
-pnpm api:create-internal -- <邮箱> <密码> <姓名> ADMIN  # 管理员（审核工作台）
+pnpm api:init-super-admin -- super "超级管理员" "<强密码>"          # 超级管理员（受保护）
+pnpm api:create-internal -- admin01 "李四" "<强密码>" ADMIN  # 管理员（审核工作台）
 ```
 
 开发模式未配置 SMTP 时，验证码写入 `apps/api/.devmail/*.json` 并在 API 日志打印。

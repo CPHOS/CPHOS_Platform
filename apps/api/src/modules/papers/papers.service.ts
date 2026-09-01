@@ -16,7 +16,7 @@ import type {
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { prisma } from '../../db.js';
 import { env } from '../../env.js';
@@ -37,7 +37,11 @@ const PAPER_INCLUDE = {
     orderBy: { slot: 'asc' as const },
     include: {
       images: { orderBy: { partIndex: 'asc' as const } },
-      markingTasks: { orderBy: { roundNo: 'asc' as const }, select: { roundNo: true, status: true, score: true } },
+      markingTasks: {
+        where: { allocation: { status: 'ACTIVE' } },
+        orderBy: { roundNo: 'asc' as const },
+        select: { roundNo: true, status: true, score: true },
+      },
       arbitration: { select: { status: true, score: true } },
     },
   },
@@ -321,6 +325,9 @@ export async function addPaperPage(
   const profileId = await getProfileId(userId);
   const paper = await findOwnPaperOrThrow(paperId, profileId);
   assertPaperEditable(paper);
+  if (!input.fileKey.startsWith('papers/' + String(paperId) + '/')) {
+    throw Errors.validation('文件键必须属于当前整卷');
+  }
   if (input.pageNo > env.PAPER_MAX_PAGES) throw Errors.validation('超过单卷页数上限');
 
   try {
@@ -360,6 +367,9 @@ export async function bindQuestionImage(
   const question = paper.questions.find((q) => q.id === questionId);
   if (!question) throw Errors.notFound('题目');
   if (!paper.pages.some((p) => p.id === pageId)) throw Errors.notFound('答题卡页');
+  if (input.fileKey && !input.fileKey.startsWith('papers/' + String(paperId) + '/')) {
+    throw Errors.validation('文件键必须属于当前整卷');
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.questionImage.upsert({
@@ -620,9 +630,74 @@ export async function getPaperPageStream(
   if (!page) throw Errors.notFound('答题卡页');
   const absolutePath = path.resolve(process.cwd(), env.UPLOAD_DIR, page.fileKey);
   assertInsideUploadDir(absolutePath);
-  if (!existsSync(absolutePath)) throw Errors.notFound('文件');
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) throw Errors.notFound('文件');
   const mime = Object.keys(ALLOWED_UPLOAD_MIME).includes((page.mimeType ?? '').toLowerCase())
     ? page.mimeType!
     : 'application/octet-stream';
   return { stream: createReadStream(absolutePath), mimeType: mime };
+}
+
+async function readStoredPage(fileKey: string, mimeType: string | null): Promise<{
+  stream: NodeJS.ReadableStream;
+  mimeType: string;
+}> {
+  const absolutePath = path.resolve(process.cwd(), env.UPLOAD_DIR, fileKey);
+  assertInsideUploadDir(absolutePath);
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) throw Errors.notFound('文件');
+  const allowed = Object.keys(ALLOWED_UPLOAD_MIME).includes((mimeType ?? '').toLowerCase());
+  return {
+    stream: createReadStream(absolutePath),
+    mimeType: allowed ? mimeType! : 'application/octet-stream',
+  };
+}
+
+/** 阅卷人按任务读取答卷图片 */
+export async function getMarkingTaskPageStream(
+  userId: bigint,
+  taskId: bigint,
+  pageId: bigint,
+): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+  const profileId = await getProfileId(userId);
+  const task = await prisma.markingTask.findFirst({
+    where: {
+      id: taskId,
+      assigneeId: profileId,
+      allocation: { status: 'ACTIVE' },
+      paperQuestion: { paper: { status: { not: 'ARCHIVED' } } },
+    },
+    select: { paperQuestionId: true },
+  });
+  if (!task) throw Errors.notFound('阅卷任务');
+  const image = await prisma.questionImage.findFirst({
+    where: { paperQuestionId: task.paperQuestionId, paperPageId: pageId },
+    select: { paperPage: { select: { fileKey: true, mimeType: true } } },
+  });
+  if (!image) throw Errors.notFound('答题图片');
+  return readStoredPage(image.paperPage.fileKey, image.paperPage.mimeType);
+}
+
+/** 仲裁人按仲裁任务读取答卷图片；PENDING 可由任一进入仲裁工作台者预览 */
+export async function getArbitrationPageStream(
+  userId: bigint,
+  arbitrationId: bigint,
+  pageId: bigint,
+): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+  const arbitration = await prisma.arbitration.findUnique({
+    where: { id: arbitrationId },
+    select: {
+      status: true,
+      claimedById: true,
+      paperQuestionId: true,
+    },
+  });
+  if (!arbitration || arbitration.status === 'CANCELED') throw Errors.notFound('仲裁任务');
+  if (arbitration.claimedById && arbitration.claimedById !== userId) {
+    throw Errors.forbidden();
+  }
+  const image = await prisma.questionImage.findFirst({
+    where: { paperQuestionId: arbitration.paperQuestionId, paperPageId: pageId },
+    select: { paperPage: { select: { fileKey: true, mimeType: true } } },
+  });
+  if (!image) throw Errors.notFound('答题图片');
+  return readStoredPage(image.paperPage.fileKey, image.paperPage.mimeType);
 }

@@ -55,6 +55,7 @@ export async function gradeMarkingTask(
   if (!task || task.assigneeId !== profile.id) throw Errors.notFound('阅卷任务');
   if (task.status !== 'PENDING') throw Errors.validation('该任务已完成或已取消');
   if (task.allocation?.status !== 'ACTIVE') throw Errors.validation('分配批次已撤销，任务不可评分');
+  if (task.paperQuestion.paper.finalizedAt) throw Errors.validation('整卷已定稿，不可再评分');
   if (task.paperQuestion.paper.exam.status !== 'PUBLISHED') {
     throw Errors.validation('考试非进行中状态，不可评分');
   }
@@ -145,6 +146,7 @@ export async function listArbitrations(
   query: ListArbitrationsQuery,
 ): Promise<ArbitrationListDto> {
   const where: Prisma.ArbitrationWhereInput = {
+    paperQuestion: { markingTasks: { some: { allocation: { status: 'ACTIVE' } } } },
     ...(query.status ? { status: query.status } : {}),
   };
   const [total, rows] = await Promise.all([
@@ -164,7 +166,11 @@ export async function listArbitrations(
                 exam: { select: { name: true } },
               },
             },
-            markingTasks: { orderBy: { roundNo: 'asc' }, select: { score: true } },
+            markingTasks: {
+              where: { allocation: { status: 'ACTIVE' } },
+              orderBy: { roundNo: 'asc' },
+              select: { score: true },
+            },
           },
         },
       },
@@ -202,6 +208,15 @@ export async function claimArbitration(userId: bigint, id: bigint): Promise<void
   if (existing.status === 'COMPLETED' || existing.status === 'CANCELED') {
     throw Errors.validation('仲裁任务已完成或已取消');
   }
+  const activeReview = await prisma.markingTask.findFirst({
+    where: {
+      paperQuestionId: existing.paperQuestionId,
+      status: 'COMPLETED',
+      allocation: { status: 'ACTIVE' },
+    },
+    select: { id: true },
+  });
+  if (!activeReview) throw Errors.validation('仲裁对应的阅卷批次已撤销');
   if (existing.claimedById === userId) return;
   if (existing.claimedById) throw Errors.forbidden();
   if (existing.paperQuestion.paper.exam.status !== 'PUBLISHED') {
@@ -236,6 +251,15 @@ export async function gradeArbitration(
   if (arbitration.paperQuestion.paper.exam.status !== 'PUBLISHED') {
     throw Errors.validation('考试非进行中状态，不可仲裁');
   }
+  const activeReview = await prisma.markingTask.findFirst({
+    where: {
+      paperQuestionId: arbitration.paperQuestionId,
+      status: 'COMPLETED',
+      allocation: { status: 'ACTIVE' },
+    },
+    select: { id: true },
+  });
+  if (!activeReview) throw Errors.validation('仲裁对应的阅卷批次已撤销');
   if (arbitration.claimedById && arbitration.claimedById !== userId) {
     throw Errors.forbidden();
   }

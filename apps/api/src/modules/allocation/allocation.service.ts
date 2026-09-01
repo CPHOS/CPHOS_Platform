@@ -77,6 +77,19 @@ async function findBatchOrThrow(id: bigint): Promise<BatchWithRelations> {
   return batch;
 }
 
+async function recomputePaper(tx: Prisma.TransactionClient, paperId: bigint): Promise<void> {
+  const questions = await tx.paperQuestion.findMany({ where: { paperId }, select: { finalScore: true } });
+  const allFinal = questions.length > 0 && questions.every((q) => q.finalScore !== null);
+  let total = new Prisma.Decimal(0);
+  for (const q of questions) {
+    if (q.finalScore !== null) total = total.plus(q.finalScore);
+  }
+  await tx.paper.update({
+    where: { id: paperId },
+    data: { score: allFinal ? total : null, finalizedAt: allFinal ? new Date() : null },
+  });
+}
+
 export async function previewAllocation(examId: bigint): Promise<AllocationPreviewDto> {
   const exam = await prisma.exam.findUnique({
     where: { id: examId },
@@ -86,7 +99,7 @@ export async function previewAllocation(examId: bigint): Promise<AllocationPrevi
   if (exam.status !== 'PUBLISHED') throw Errors.validation('仅已发布考试可分配');
 
   const papers = await prisma.paper.findMany({
-    where: { examId, status: 'READY' },
+    where: { examId, status: 'READY', finalizedAt: null },
     select: { id: true },
   });
   const paperIds = papers.map((p) => p.id);
@@ -154,7 +167,10 @@ export async function createAllocation(
   if (preview.unassignedSlots.length > 0) {
     throw Errors.validation('以下槽位没有可用阅卷成员：' + preview.unassignedSlots.join(', '));
   }
-  const papers = await prisma.paper.findMany({ where: { examId, status: 'READY' }, select: { id: true } });
+  const papers = await prisma.paper.findMany({
+    where: { examId, status: 'READY', finalizedAt: null },
+    select: { id: true },
+  });
   const paperIds = papers.map((p) => p.id);
   const questions = await prisma.paperQuestion.findMany({
     where: { paperId: { in: paperIds } },
@@ -269,6 +285,36 @@ export async function revokeBatch(id: bigint, operatorId: bigint): Promise<Alloc
       where: { allocationId: id, status: 'PENDING' },
       data: { status: 'CANCELED' },
     });
+    const affected = await tx.markingTask.findMany({
+      where: { allocationId: id },
+      select: {
+        paperQuestionId: true,
+        paperQuestion: { select: { paperId: true, paper: { select: { finalizedAt: true } } } },
+      },
+    });
+    if (affected.some((a) => a.paperQuestion.paper.finalizedAt)) {
+      throw Errors.validation('该批次包含已定稿整卷，禁止撤销；如需重阅请走专门流程');
+    }
+    const questionIds = [...new Set(affected.map((a) => a.paperQuestionId))];
+    const paperIds = [...new Set(affected.map((a) => a.paperQuestion.paperId))];
+    if (questionIds.length > 0) {
+      await tx.arbitration.updateMany({
+        where: { paperQuestionId: { in: questionIds }, status: { not: 'COMPLETED' } },
+        data: { status: 'CANCELED', score: null },
+      });
+      // 已完成的旧仲裁同样不得再作为新批次成绩
+      await tx.arbitration.updateMany({
+        where: { paperQuestionId: { in: questionIds }, status: 'COMPLETED' },
+        data: { status: 'CANCELED' },
+      });
+      await tx.paperQuestion.updateMany({
+        where: { id: { in: questionIds } },
+        data: { finalScore: null },
+      });
+    }
+    for (const paperId of paperIds) {
+      await recomputePaper(tx, paperId);
+    }
     await tx.auditLog.create({
       data: {
         operatorId,

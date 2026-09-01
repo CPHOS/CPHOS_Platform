@@ -61,6 +61,7 @@ describe('生产环境密钥 fail-fast', () => {
     vi.stubEnv('CODE_SALT', 's'.repeat(32));
     vi.stubEnv('DATABASE_URL', 'postgresql://cphos:secret@db.example.com:5432/cphos');
     vi.stubEnv('CORS_ORIGIN', 'https://exam.example.com');
+    vi.stubEnv('HOST', '127.0.0.1');
     vi.stubEnv('SMTP_HOST', 'smtp.example.com');
     vi.stubEnv('SMTP_FROM', 'CPHOS <no-reply@example.com>');
     const { env } = await loadEnv();

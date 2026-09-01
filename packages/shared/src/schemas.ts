@@ -332,7 +332,7 @@ export const storedFileKeySchema = z
   .string()
   .trim()
   .max(300)
-  .regex(/^papers\/\d+\/[A-Za-z0-9._-]+$/, '文件键不合法');
+  .regex(/^papers\/\d+\/(?!\.{1,2}$)[A-Za-z0-9._-]+$/, '文件键不合法');
 
 export const addPaperPageSchema = z.object({
   pageNo: z.number().int().min(1).max(1000),
