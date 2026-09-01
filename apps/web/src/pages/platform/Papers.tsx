@@ -226,6 +226,18 @@ export function PapersPage() {
     }
   };
 
+  const abandonPaper = async () => {
+    if (!selected) return;
+    try {
+      const updated = await paperApi.setStatus(selected.id, { status: 'ARCHIVED' });
+      setSelected(updated);
+      refresh();
+      message.success('整卷已放弃归档');
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    }
+  };
+
   const columns: ColumnsType<PaperDto> = [
     { title: '考试', dataIndex: 'examName', ellipsis: true },
     { title: '学生', dataIndex: 'studentName', ellipsis: true },
@@ -329,6 +341,19 @@ export function PapersPage() {
               <Popconfirm title="确认所有题目都已绑定并标记就绪？" onConfirm={() => void markReady()}>
                 <Button disabled={selected.status !== 'UPLOADING'} data-testid="paper-mark-ready">
                   标记整卷就绪
+                </Button>
+              </Popconfirm>
+              <Popconfirm
+                title="归档后将作为放弃卷，不再参与考试；确认？"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => void abandonPaper()}
+              >
+                <Button
+                  danger
+                  disabled={selected.status === 'ARCHIVED' || !!selected.finalizedAt || selected.questions.some((q) => q.finalScore !== null)}
+                  data-testid="paper-abandon"
+                >
+                  放弃并归档
                 </Button>
               </Popconfirm>
             </Space>

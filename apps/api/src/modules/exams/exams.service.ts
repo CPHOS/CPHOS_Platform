@@ -149,10 +149,11 @@ export async function upsertExamConfig(
   operatorId: bigint,
   input: UpsertExamConfigInput,
 ): Promise<ExamDto> {
-  const exam = await findExamOrThrow(id);
-  if (exam.status !== 'DRAFT') throw Errors.validation('仅草稿考试可修改配置（发布后请保持配置冻结）');
-
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
+    const exam = await tx.exam.findUnique({ where: { id }, select: { status: true } });
+    if (!exam) throw Errors.notFound('考试');
+    if (exam.status !== 'DRAFT') throw Errors.validation('仅草稿考试可修改配置（发布后请保持配置冻结）');
     await tx.examConfig.upsert({
       where: { examId: id },
       create: {
@@ -177,11 +178,12 @@ export async function upsertExamConfig(
 }
 
 export async function publishExam(id: bigint, operatorId: bigint): Promise<ExamDto> {
-  const exam = await findExamOrThrow(id);
-  if (exam.status !== 'DRAFT') throw Errors.validation('仅草稿考试可发布');
-  if (!exam.config) throw Errors.validation('请先完成考试配置再发布');
-
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
+    const exam = await tx.exam.findUnique({ where: { id }, include: { config: true } });
+    if (!exam) throw Errors.notFound('考试');
+    if (exam.status !== 'DRAFT') throw Errors.validation('仅草稿考试可发布');
+    if (!exam.config) throw Errors.validation('请先完成考试配置再发布');
     const changed = await tx.exam.updateMany({
       where: { id, status: 'DRAFT' },
       data: { status: 'PUBLISHED', publishedAt: new Date() },

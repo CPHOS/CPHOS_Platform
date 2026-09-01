@@ -162,64 +162,6 @@ export async function createAllocation(
   operatorId: bigint,
   input: CreateAllocationInput,
 ): Promise<AllocationBatchDto> {
-  const preview = await previewAllocation(examId);
-  if (preview.questionCount === 0) throw Errors.validation('没有已就绪的整卷题目可分配');
-  if (preview.unassignedSlots.length > 0) {
-    throw Errors.validation('以下槽位没有可用阅卷成员：' + preview.unassignedSlots.join(', '));
-  }
-  const papers = await prisma.paper.findMany({
-    where: { examId, status: 'READY', finalizedAt: null },
-    select: { id: true },
-  });
-  const paperIds = papers.map((p) => p.id);
-  const questions = await prisma.paperQuestion.findMany({
-    where: { paperId: { in: paperIds } },
-    orderBy: { id: 'asc' },
-    select: { id: true, slot: true },
-  });
-  const slots = [...new Set(questions.map((q) => q.slot))].sort((a, b) => a - b);
-  const examiners = await prisma.memberProfile.findMany({
-    where: {
-      defaultSlot: { in: slots },
-      auditStatus: 1,
-      user: { status: 'ACTIVE' },
-    },
-    orderBy: { id: 'asc' },
-    select: { id: true, defaultSlot: true },
-  });
-  const bySlot = new Map<number, bigint[]>();
-  for (const e of examiners) {
-    if (e.defaultSlot === null) continue;
-    const list = bySlot.get(e.defaultSlot) ?? [];
-    list.push(e.id);
-    bySlot.set(e.defaultSlot, list);
-  }
-
-  const load = new Map<string, number>();
-  const loadKey = (slot: number, id: bigint) => slot + ':' + String(id);
-  const nextAssignee = (slot: number): bigint => {
-    const list = bySlot.get(slot) ?? [];
-    const first = list[0];
-    if (!first) throw Errors.validation('槽位 ' + slot + ' 没有可用阅卷成员');
-    let best = first;
-    let bestLoad = load.get(loadKey(slot, best)) ?? 0;
-    for (const id of list) {
-      const value = load.get(loadKey(slot, id)) ?? 0;
-      if (value < bestLoad || (value === bestLoad && id < best)) {
-        best = id;
-        bestLoad = value;
-      }
-    }
-    load.set(loadKey(slot, best), (load.get(loadKey(slot, best)) ?? 0) + 1);
-    return best;
-  };
-
-  const tasks: { paperQuestionId: bigint; roundNo: number; assigneeId: bigint }[] = [];
-  for (const q of questions) {
-    tasks.push({ paperQuestionId: q.id, roundNo: 1, assigneeId: nextAssignee(q.slot) });
-    tasks.push({ paperQuestionId: q.id, roundNo: 2, assigneeId: nextAssignee(q.slot) });
-  }
-
   const batch = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
     const freshExam = await tx.exam.findUnique({ where: { id: examId }, select: { status: true } });
@@ -228,6 +170,68 @@ export async function createAllocation(
     }
     const active = await tx.allocationBatch.findFirst({ where: { examId, status: 'ACTIVE' } });
     if (active) throw Errors.validation('该考试已有生效中的分配批次');
+
+    // 在锁内重读分配输入，避免锁外快照漏掉新 READY/新上传整卷
+    const papers = await tx.paper.findMany({
+      where: { examId, status: 'READY', finalizedAt: null },
+      select: { id: true },
+    });
+    if (papers.length === 0) throw Errors.validation('没有已就绪的整卷可分配');
+    const paperIds = papers.map((p) => p.id);
+    const questions = await tx.paperQuestion.findMany({
+      where: { paperId: { in: paperIds } },
+      orderBy: { id: 'asc' },
+      select: { id: true, slot: true },
+    });
+    if (questions.length === 0) throw Errors.validation('没有已就绪的整卷题目可分配');
+    const slots = [...new Set(questions.map((q) => q.slot))].sort((a, b) => a - b);
+    const examiners = await tx.memberProfile.findMany({
+      where: {
+        defaultSlot: { in: slots },
+        auditStatus: 1,
+        user: { status: 'ACTIVE' },
+      },
+      orderBy: { id: 'asc' },
+      select: { id: true, defaultSlot: true },
+    });
+    const examinerCounts = new Map<number, number>();
+    const bySlot = new Map<number, bigint[]>();
+    for (const e of examiners) {
+      if (e.defaultSlot === null) continue;
+      examinerCounts.set(e.defaultSlot, (examinerCounts.get(e.defaultSlot) ?? 0) + 1);
+      const list = bySlot.get(e.defaultSlot) ?? [];
+      list.push(e.id);
+      bySlot.set(e.defaultSlot, list);
+    }
+    const unassignedSlots = slots.filter((slot) => (examinerCounts.get(slot) ?? 0) === 0);
+    if (unassignedSlots.length > 0) {
+      throw Errors.validation('以下槽位没有可用阅卷成员：' + unassignedSlots.join(', '));
+    }
+
+    const load = new Map<string, number>();
+    const loadKey = (slot: number, id: bigint) => slot + ':' + String(id);
+    const nextAssignee = (slot: number): bigint => {
+      const list = bySlot.get(slot) ?? [];
+      const first = list[0];
+      if (!first) throw Errors.validation('槽位 ' + slot + ' 没有可用阅卷成员');
+      let best = first;
+      let bestLoad = load.get(loadKey(slot, best)) ?? 0;
+      for (const id of list) {
+        const value = load.get(loadKey(slot, id)) ?? 0;
+        if (value < bestLoad || (value === bestLoad && id < best)) {
+          best = id;
+          bestLoad = value;
+        }
+      }
+      load.set(loadKey(slot, best), (load.get(loadKey(slot, best)) ?? 0) + 1);
+      return best;
+    };
+    const tasks: { paperQuestionId: bigint; roundNo: number; assigneeId: bigint }[] = [];
+    for (const q of questions) {
+      tasks.push({ paperQuestionId: q.id, roundNo: 1, assigneeId: nextAssignee(q.slot) });
+      tasks.push({ paperQuestionId: q.id, roundNo: 2, assigneeId: nextAssignee(q.slot) });
+    }
+
     const created = await tx.allocationBatch.create({
       data: { examId, createdById: operatorId, note: input.note ?? null },
     });

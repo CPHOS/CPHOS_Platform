@@ -39,8 +39,10 @@ test.describe.serial('阶段A后台管理', () => {
     await page.getByRole('button', { name: /确\s*定/ }).click();
     await expect(page.getByRole('listitem').filter({ hasText: '教练乙' })).toHaveCount(0);
 
-    // 审计日志应出现创建团队记录
+    // 审计日志应出现创建团队记录（按团队名过滤，避免并行用例刷出第一页）
     await page.goto('/admin/logs');
+    await page.getByPlaceholder('备注 / 关联账号编号').fill(teamName);
+    await page.getByPlaceholder('备注 / 关联账号编号').press('Enter');
     await expect(page.getByText('创建团队').first()).toBeVisible();
     await expect(page.getByText(new RegExp(teamName)).first()).toBeVisible();
 

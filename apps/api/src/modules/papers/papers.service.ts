@@ -274,6 +274,13 @@ export async function createPaper(
       if (!freshExam || freshExam.status !== 'PUBLISHED') {
         throw Errors.validation('考试已非进行中状态，不能创建整卷');
       }
+      const activeAllocation = await tx.allocationBatch.findFirst({
+        where: { examId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (activeAllocation) {
+        throw Errors.validation('本场考试已生成分配，不能新增整卷；请先撤销分配后重试');
+      }
       const quotaWhere = profile.teamId
         ? { examId, uploadedBy: { teamId: profile.teamId } }
         : { examId, uploadedById: profile.id };
@@ -470,6 +477,16 @@ export async function setPaperStatus(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${paper.examId})`;
+    if (input.status === 'READY') {
+      const activeAllocation = await tx.allocationBatch.findFirst({
+        where: { examId: paper.examId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (activeAllocation) {
+        throw Errors.validation('本场考试已生成分配，不能追加标记就绪；请先撤销分配后重试');
+      }
+    }
     const changed = await tx.paper.updateMany({
       where: { id: paperId, uploadedById: profileId },
       data: { status: input.status },

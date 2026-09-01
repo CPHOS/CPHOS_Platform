@@ -81,6 +81,19 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
     });
   }
 
+  // 教练可主动放弃并把未完成卷归档，考试结束时忽略该卷
+  const abandonStudent = await request
+    .post('/api/students', { headers: coachAuth, data: { name: '弃考学生' + suffix } })
+    .then((r: any) => r.json());
+  const abandonPaper = await request
+    .post('/api/papers', { headers: coachAuth, data: { examId: exam.id, studentId: abandonStudent.id } })
+    .then((r: any) => r.json());
+  const abandonStatus = await request.post('/api/papers/' + abandonPaper.id + '/status', {
+    headers: coachAuth,
+    data: { status: 'ARCHIVED' },
+  });
+  expect(abandonStatus.ok()).toBeTruthy();
+
   // 有未定稿整卷时不能结束考试
   const closeUnfinalized = await request.post('/api/admin/exams/' + exam.id + '/close', {
     headers: adminAuth,
@@ -92,6 +105,16 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   const first = await request.post('/api/admin/exams/' + exam.id + '/allocation', { headers: adminAuth, data: {} });
   expect(first.ok()).toBeTruthy();
   const batch = await first.json();
+
+  // 已生成 ACTIVE 分配后不允许新增整卷
+  const lateStudent = await request
+    .post('/api/students', { headers: coachAuth, data: { name: '迟到学生' + suffix } })
+    .then((r: any) => r.json());
+  const latePaper = await request.post('/api/papers', {
+    headers: coachAuth,
+    data: { examId: exam.id, studentId: lateStudent.id },
+  });
+  expect(latePaper.status()).toBe(400);
   const revoke = await request.post('/api/admin/allocation/batches/' + batch.id + '/revoke', {
     headers: adminAuth,
     data: {},
