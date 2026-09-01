@@ -10,10 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate": "prisma db push",
+    "prisma:db-push:e2e": "prisma db push --accept-data-loss",
     "init-super-admin": "tsx scripts/init-super-admin.ts",
     "create-internal": "tsx scripts/create-internal.ts",
-    "seed:dev": "tsx scripts/seed-dev.ts"
+    "seed:dev": "tsx scripts/seed-dev.ts",
+    "seed:e2e": "tsx scripts/seed-e2e.ts"
   },
   "dependencies": {
     "@cphos/shared": "workspace:*",

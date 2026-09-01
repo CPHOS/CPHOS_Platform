@@ -24,6 +24,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const onAccountFinish = async (values: AccountForm) => {
@@ -31,6 +32,7 @@ export function RegisterPage() {
     try {
       await authApi.register({ email: values.email, password: values.password });
       setEmail(values.email);
+      setPassword(values.password);
       setStep(1);
       message.success('注册成功，验证码已发送至邮箱');
     } catch (err) {
@@ -55,7 +57,8 @@ export function RegisterPage() {
 
   const resend = async () => {
     try {
-      await authApi.sendCode({ email, purpose: 'REGISTER' });
+      // 注册码必须与候选密码一起重新提交，避免单独重发导致旧密码被激活
+      await authApi.register({ email, password });
       message.success('验证码已重新发送');
     } catch (err) {
       message.error(apiErrorMessage(err));

@@ -38,4 +38,6 @@ export const Errors = {
     new AppError(409, ERROR_CODES.ALREADY_REVIEWED, '该申请已审核，不可重复操作'),
   legacyAlreadyClaimed: () =>
     new AppError(409, ERROR_CODES.LEGACY_ALREADY_CLAIMED, '该旧账号已被其他用户认领'),
+  dictInUse: () =>
+    new AppError(409, ERROR_CODES.DICT_IN_USE, '该字典项已被引用，不能删除'),
 };

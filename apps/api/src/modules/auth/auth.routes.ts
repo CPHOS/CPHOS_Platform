@@ -1,17 +1,28 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  changePasswordSchema,
+  confirmEmailChangeSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  requestEmailChangeSchema,
+  resetPasswordSchema,
   sendCodeSchema,
   verifyEmailSchema,
   type AuthResponse,
 } from '@cphos/shared';
+import { env } from '../../env.js';
 import { Errors } from '../../lib/errors.js';
 import {
+  changePassword,
+  confirmEmailChange,
+  forgotPassword,
   getUserDto,
   login,
   logout,
   register,
+  requestEmailChange,
+  resetPassword,
   rotateRefreshToken,
   sendCode,
   verifyEmail,
@@ -36,9 +47,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.setCookie(REFRESH_COOKIE, token, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production',
       path: '/api/auth',
-      maxAge: 30 * 86_400,
+      maxAge: env.REFRESH_TOKEN_TTL_DAYS * 86_400,
     });
   };
 
@@ -56,6 +67,35 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/verify-email', async (req) => {
     const input = verifyEmailSchema.parse(req.body);
     return verifyEmail(input);
+  });
+
+  // ---------- 账号安全 ----------
+
+  app.post('/password/forgot', async (req) => {
+    const input = forgotPasswordSchema.parse(req.body);
+    return forgotPassword(input);
+  });
+
+  app.post('/password/reset', async (req) => {
+    const input = resetPasswordSchema.parse(req.body);
+    return resetPassword(input);
+  });
+
+  const authGuard = [app.authenticate];
+
+  app.post('/password/change', { onRequest: authGuard }, async (req) => {
+    const input = changePasswordSchema.parse(req.body);
+    return changePassword(BigInt(req.user.sub), input);
+  });
+
+  app.post('/email/change/request', { onRequest: authGuard }, async (req) => {
+    const input = requestEmailChangeSchema.parse(req.body);
+    return requestEmailChange(BigInt(req.user.sub), input);
+  });
+
+  app.post('/email/change/confirm', { onRequest: authGuard }, async (req) => {
+    const input = confirmEmailChangeSchema.parse(req.body);
+    return confirmEmailChange(BigInt(req.user.sub), input);
   });
 
   app.post('/login', async (req, reply) => {

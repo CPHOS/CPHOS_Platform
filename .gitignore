@@ -8,3 +8,8 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .npmrc
+
+# 本地 E2E（不接 CI）
+test-results/
+playwright-report/
+e2e/artifacts/

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   idSchema,
   listApplicationsQuerySchema,
+  listAuditLogsQuerySchema,
   reviewDecisionSchema,
 } from '@cphos/shared';
 import {
@@ -38,10 +39,11 @@ export async function adminAuditRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/logs', { onRequest: guard }, async (req) => {
-    const query = listApplicationsQuerySchema.pick({ page: true, pageSize: true }).parse(req.query);
-    const applicationId = (req.query as { applicationId?: string }).applicationId;
+    const query = listAuditLogsQuerySchema.parse(req.query);
     return listLogs({
-      applicationId: applicationId ? BigInt(idSchema.parse(applicationId)) : undefined,
+      applicationId: query.applicationId ? BigInt(query.applicationId) : undefined,
+      action: query.action,
+      q: query.q,
       page: query.page,
       pageSize: query.pageSize,
     });
