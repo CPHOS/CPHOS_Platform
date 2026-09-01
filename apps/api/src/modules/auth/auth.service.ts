@@ -1,5 +1,5 @@
 import type { EmailCodePurpose, UserDto } from '@cphos/shared';
-import type { EmailCode, UserAccount, MemberProfile, School, MemberRole } from '@prisma/client';
+import type { EmailCode, UserAccount, MemberProfile, School, Team, MemberRole } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { env } from '../../env.js';
 import { Errors } from '../../lib/errors.js';
@@ -15,7 +15,7 @@ import {
 
 // ---------- 用户 DTO ----------
 
-type ProfileWithSchool = (MemberProfile & { school: School | null }) | null;
+type ProfileWithSchool = (MemberProfile & { school: School | null; team: Team | null }) | null;
 
 function toUserDto(user: UserAccount & { profile: ProfileWithSchool }): UserDto {
   return {
@@ -36,14 +36,14 @@ function toUserDto(user: UserAccount & { profile: ProfileWithSchool }): UserDto 
           schoolName: user.profile.school?.name ?? null,
           role: user.profile.role,
           defaultSlot: user.profile.defaultSlot,
-          uploadLimit: user.profile.uploadLimit,
+          uploadLimit: user.profile.team?.uploadLimit ?? 100,
         }
       : null,
   };
 }
 
 export const USER_INCLUDE = {
-  profile: { include: { school: true } },
+  profile: { include: { school: true, team: true } },
 } as const;
 
 // ---------- 验证码 ----------

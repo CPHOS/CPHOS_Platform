@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { AppstoreOutlined, AuditOutlined, HomeOutlined, IdcardOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, AuditOutlined, HomeOutlined, IdcardOutlined, TeamOutlined, UsergroupAddOutlined, UserOutlined } from '@ant-design/icons';
 import { RequireAuth } from './components/RequireAuth';
 import { ShellLayout } from './layouts/ShellLayout';
 import { AdminHome } from './pages/admin/Home';
@@ -7,6 +7,7 @@ import { AuditList } from './pages/admin/audit/List';
 import { AuditDetail } from './pages/admin/audit/Detail';
 import { AccountsList } from './pages/admin/accounts/List';
 import { MembersList } from './pages/admin/members/List';
+import { TeamsList } from './pages/admin/teams/List';
 import { LoginPage } from './pages/auth/Login';
 import { RegisterPage } from './pages/auth/Register';
 import { VerifyEmailPage } from './pages/auth/VerifyEmail';
@@ -82,6 +83,7 @@ export function App() {
                 { key: '/admin', label: '概览', icon: <AppstoreOutlined /> },
                 { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined /> },
                 { key: '/admin/members', label: '成员管理', icon: <TeamOutlined /> },
+                { key: '/admin/teams', label: '团队管理', icon: <UsergroupAddOutlined /> },
                 { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined /> },
                 { key: '/admin/profile', label: '个人信息', icon: <IdcardOutlined /> },
               ]}
@@ -93,6 +95,7 @@ export function App() {
         <Route path="audit" element={<AuditList />} />
         <Route path="audit/:id" element={<AuditDetail />} />
         <Route path="members" element={<MembersList />} />
+        <Route path="teams" element={<TeamsList />} />
         <Route path="accounts" element={<AccountsList />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>

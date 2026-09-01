@@ -27,12 +27,10 @@ import { adminMembersApi } from '../../../api/members';
 interface EditForm {
   realName: string;
   schoolId?: string;
-  role: MemberRole;
   defaultSlot?: number | null;
-  uploadLimit: number;
 }
 
-/** 管理员：成员档案管理（列表 + 编辑） */
+/** 管理员：成员档案管理（列表 + 编辑；角色/限额由团队管理） */
 export function MembersList() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -56,9 +54,7 @@ export function MembersList() {
     form.setFieldsValue({
       realName: m.realName ?? '',
       schoolId: m.schoolId ?? undefined,
-      role: m.role,
       defaultSlot: m.defaultSlot ?? null,
-      uploadLimit: m.uploadLimit,
     });
   };
 
@@ -70,9 +66,7 @@ export function MembersList() {
       const input: UpdateMemberInput = {
         realName: values.realName,
         schoolId: values.schoolId ?? null,
-        role: values.role,
         defaultSlot: values.defaultSlot ?? null,
-        uploadLimit: values.uploadLimit,
       };
       await adminMembersApi.update(editing.userId, input);
       message.success('已保存');
@@ -93,8 +87,21 @@ export function MembersList() {
       dataIndex: 'role',
       render: (v: MemberRole) => <Tag color={v === 'LEADER' ? 'blue' : 'green'}>{ROLE_LABELS[v]}</Tag>,
     },
+    {
+      title: '团队',
+      render: (_, r) =>
+        r.team ? (
+          <span>
+            {r.team.name ?? `团队 #${r.team.id}`}
+            <span style={{ color: '#8b949e' }}> · 限额 {r.team.uploadLimit}</span>
+          </span>
+        ) : (
+          '-'
+        ),
+      responsive: ['md'],
+      ellipsis: true,
+    },
     { title: '默认槽位', dataIndex: 'defaultSlot', render: (v: number | null) => v ?? '-', responsive: ['md'] },
-    { title: '上传限额', dataIndex: 'uploadLimit', responsive: ['lg'] },
     { title: '账号', render: (_, r) => r.account.email ?? r.account.loginName ?? '-', responsive: ['md'], ellipsis: true },
     { title: '操作', render: (_, r) => <a onClick={() => openEdit(r)}>编辑</a> },
   ];
@@ -169,15 +176,8 @@ export function MembersList() {
               }))}
             />
           </Form.Item>
-          <Form.Item name="role" label="业务角色" rules={[{ required: true, message: '请选择角色' }]}>
-            {/* TODO(Q3 团队模型)：定案前暂不提供附属教练（COACH 需团队绑定） */}
-            <Select options={[{ value: 'LEADER', label: ROLE_LABELS.LEADER }]} />
-          </Form.Item>
           <Form.Item name="defaultSlot" label="默认批阅槽位（1-10，可留空）">
             <InputNumber min={1} max={10} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="uploadLimit" label="上传限额" rules={[{ required: true, message: '请输入上传限额' }]}>
-            <InputNumber min={0} max={60000} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Drawer>

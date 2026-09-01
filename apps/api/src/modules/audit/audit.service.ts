@@ -304,7 +304,7 @@ export async function review(
         });
         if (transitioned.count !== 1) throw Errors.alreadyReviewed();
 
-        await tx.memberProfile.upsert({
+        const profile = await tx.memberProfile.upsert({
           where: { userId: app.userId },
           create: {
             userId: app.userId,
@@ -312,7 +312,6 @@ export async function review(
             schoolId,
             role: 'LEADER',
             defaultSlot: decision.defaultSlot ?? null,
-            uploadLimit,
             auditStatus: 1,
           },
           update: {
@@ -320,9 +319,19 @@ export async function review(
             schoolId,
             role: 'LEADER',
             defaultSlot: decision.defaultSlot ?? null,
-            uploadLimit,
             auditStatus: 1,
           },
+        });
+
+        // 审核通过自动建单人团队（docs §6：个人参赛者=单人团队；上传限额共享在团队上）
+        const team = await tx.team.upsert({
+          where: { leaderId: profile.id },
+          create: { leaderId: profile.id, uploadLimit },
+          update: { uploadLimit },
+        });
+        await tx.memberProfile.update({
+          where: { id: profile.id },
+          data: { teamId: team.id },
         });
 
         try {

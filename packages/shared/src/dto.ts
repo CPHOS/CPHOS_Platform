@@ -117,7 +117,7 @@ export interface MemberDto {
   schoolName: string | null;
   role: MemberRole;
   defaultSlot: number | null;
-  uploadLimit: number;
+  team: { id: string; name: string | null; uploadLimit: number } | null;
   account: { email: string | null; loginName: string | null; status: UserStatus };
 }
 
@@ -142,6 +142,37 @@ export interface AccountDto {
 
 export interface AccountListDto {
   items: AccountDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ---------- 团队管理（功能块③ C3） ----------
+
+export interface TeamMemberDto {
+  userId: string;
+  realName: string | null;
+  schoolName: string | null;
+  role: MemberRole;
+  email: string | null;
+  loginName: string | null;
+}
+
+export interface TeamDto {
+  id: string;
+  name: string | null;
+  uploadLimit: number;
+  leader: { userId: string; realName: string | null };
+  memberCount: number;
+  createdAt: string;
+}
+
+export interface TeamDetailDto extends TeamDto {
+  members: TeamMemberDto[];
+}
+
+export interface TeamListDto {
+  items: TeamDto[];
   total: number;
   page: number;
   pageSize: number;

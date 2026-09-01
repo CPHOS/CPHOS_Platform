@@ -109,13 +109,11 @@ export const setAccountStatusSchema = z.object({
 });
 export type SetAccountStatusInput = z.infer<typeof setAccountStatusSchema>;
 
-/** 成员资料更新 */
+/** 成员资料更新（角色/上传限额由团队管理，此处不再编辑） */
 export const updateMemberSchema = z.object({
   realName: z.string().trim().min(1, '请输入真实姓名').max(50, '姓名过长').optional(),
   schoolId: idSchema.nullable().optional(),
-  role: z.enum(MEMBER_ROLES).optional(),
   defaultSlot: z.number().int().min(1).max(10).nullable().optional(),
-  uploadLimit: z.number().int().min(0).max(60000).optional(),
 });
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 
@@ -135,3 +133,29 @@ export const listAccountsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListAccountsQuery = z.infer<typeof listAccountsQuerySchema>;
+
+// ---------- 团队管理（功能块③ C3） ----------
+
+/** 更新团队（名称 / 共享上传限额 / 换负责人） */
+export const updateTeamSchema = z.object({
+  name: z.string().trim().min(1, '请输入团队名称').max(50, '名称过长').optional(),
+  uploadLimit: z.number().int().min(0).max(60000).optional(),
+  leaderId: idSchema.optional(),
+});
+export type UpdateTeamInput = z.infer<typeof updateTeamSchema>;
+
+/** 新增子账号：新建账号并挂入团队（管理员建档，免邮箱验证） */
+export const createSubAccountSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  realName: z.string().trim().min(1, '请输入真实姓名').max(50, '姓名过长'),
+  schoolId: idSchema.nullable().optional(),
+});
+export type CreateSubAccountInput = z.infer<typeof createSubAccountSchema>;
+
+export const listTeamsQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListTeamsQuery = z.infer<typeof listTeamsQuerySchema>;

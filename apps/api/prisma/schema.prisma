@@ -49,6 +49,9 @@ enum AuditAction {
   ROLE_CHANGE // 账号层级变更（提升/降级）
   STATUS_CHANGE // 账号状态变更（启用/禁用）
   MEMBER_UPDATE // 成员资料修改
+  TEAM_UPDATE // 团队信息修改
+  TEAM_ADD_MEMBER // 团队新增子账号
+  TEAM_REMOVE_MEMBER // 团队移除成员
 }
 
 enum MemberRole {
@@ -166,21 +169,24 @@ model MemberProfile {
   role        MemberRole  @default(LEADER)
   teamId      BigInt?
   defaultSlot Int? // 默认批阅槽位 1~10
-  uploadLimit Int         @default(100)
   auditStatus Int         @default(0) // 0 待审核 1 已通过（对齐旧平台语义）
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  team Team? @relation(fields: [teamId], references: [id])
+  team    Team? @relation("TeamMembers", fields: [teamId], references: [id])
+  ledTeam Team? @relation("TeamLeader")
 }
 
 model Team {
-  id        BigInt   @id @default(autoincrement())
-  name      String?
-  leaderId  BigInt
-  createdAt DateTime @default(now())
+  id          BigInt   @id @default(autoincrement())
+  name        String?
+  leaderId    BigInt   @unique
+  leader      MemberProfile @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: Restrict)
+  uploadLimit Int      @default(100) // 团队共享上传限额（个人参赛者=1）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  members MemberProfile[]
+  members MemberProfile[] @relation("TeamMembers")
 }
 
 // ---------- 主数据字典（旧库导入种子，保留旧 id） ----------

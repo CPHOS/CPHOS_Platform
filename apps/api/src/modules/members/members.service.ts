@@ -8,7 +8,7 @@ import type {
   MemberListDto,
   UpdateMemberInput,
 } from '@cphos/shared';
-import type { MemberProfile, School, UserAccount, UserStatus } from '@prisma/client';
+import type { MemberProfile, School, Team, UserAccount, UserStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { Errors } from '../../lib/errors.js';
@@ -18,11 +18,13 @@ import { hashPassword } from '../../lib/password.js';
 
 const MEMBER_INCLUDE = {
   school: true,
+  team: true,
   user: { select: { email: true, loginName: true, status: true } },
 } as const;
 
 type MemberWithRelations = MemberProfile & {
   school: School | null;
+  team: Team | null;
   user: { email: string | null; loginName: string | null; status: UserStatus };
 };
 
@@ -44,7 +46,9 @@ function toMemberDto(m: MemberWithRelations): MemberDto {
     schoolName: m.school?.name ?? null,
     role: m.role,
     defaultSlot: m.defaultSlot,
-    uploadLimit: m.uploadLimit,
+    team: m.team
+      ? { id: String(m.team.id), name: m.team.name, uploadLimit: m.team.uploadLimit }
+      : null,
     account: { email: m.user.email, loginName: m.user.loginName, status: m.user.status },
   };
 }
@@ -102,11 +106,6 @@ export async function getMember(userId: bigint): Promise<MemberDto> {
   return toMemberDto(m);
 }
 
-/** 角色切换前置检查（旧 API 行为）：变更前统计未完成任务；考试域未实现，暂留桩返回 0 */
-async function countIncompleteTasks(_userId: bigint): Promise<number> {
-  return 0;
-}
-
 export async function updateMember(
   userId: bigint,
   operatorId: bigint,
@@ -115,24 +114,10 @@ export async function updateMember(
   const current = await prisma.memberProfile.findUnique({ where: { userId } });
   if (!current) throw Errors.notFound('成员');
 
-  // TODO(Q3 团队模型)：TEAM 定案前暂不支持附属教练，避免产生无归属的 COACH
-  if (input.role === 'COACH') {
-    throw Errors.validation('附属教练需绑定团队，团队功能尚未上线，暂不支持');
-  }
-
-  if (input.role && input.role !== current.role) {
-    const incomplete = await countIncompleteTasks(userId);
-    if (incomplete > 0) {
-      throw Errors.validation('该成员尚有未完成的阅卷任务，暂不能切换角色');
-    }
-  }
-
   const changes: string[] = [];
   if (input.realName !== undefined) changes.push(`姓名=${input.realName}`);
   if (input.schoolId !== undefined) changes.push(`学校=${input.schoolId ?? '空'}`);
-  if (input.role !== undefined) changes.push(`角色=${input.role}`);
   if (input.defaultSlot !== undefined) changes.push(`槽位=${input.defaultSlot ?? '空'}`);
-  if (input.uploadLimit !== undefined) changes.push(`限额=${input.uploadLimit}`);
 
   const updated = await prisma.memberProfile.update({
     where: { userId },
@@ -141,9 +126,7 @@ export async function updateMember(
       ...(input.schoolId !== undefined
         ? { schoolId: input.schoolId === null ? null : BigInt(input.schoolId) }
         : {}),
-      ...(input.role !== undefined ? { role: input.role } : {}),
       ...(input.defaultSlot !== undefined ? { defaultSlot: input.defaultSlot } : {}),
-      ...(input.uploadLimit !== undefined ? { uploadLimit: input.uploadLimit } : {}),
     },
     include: MEMBER_INCLUDE,
   });
