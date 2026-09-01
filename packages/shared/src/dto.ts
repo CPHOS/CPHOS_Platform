@@ -1,4 +1,4 @@
-import type { AccountRole, AuditStatus, MemberRole, UserStatus } from './enums.js';
+import type { AccountRole, AuditStatus, ExamStatus, MemberRole, UserStatus } from './enums.js';
 
 /** 当前登录用户（/api/auth/me 返回，BigInt 序列化为字符串） */
 export interface UserDto {
@@ -98,8 +98,12 @@ export interface AuditLogDto {
   operatorId: string;
   operatorName: string | null;
   legacyMemberId: string | null;
-  /** 账号管理类操作的目标账号 */
+  /** 账号/团队管理类操作的目标账号 */
   targetUserId: string | null;
+  /** 考试管理类操作的目标考试 */
+  examId: string | null;
+  /** 学生名册类操作的目标学生 */
+  studentId: string | null;
   remark: string | null;
   createdAt: string;
 }
@@ -221,4 +225,70 @@ export interface DictBundleDto {
   grades: NameDictDto[];
   prizes: NameDictDto[];
   topics: NameDictDto[];
+}
+
+// ---------- 考试域：M2-A ----------
+
+export interface ExamConfigTitleDto {
+  slot: number;
+  title: string;
+  questionLabel?: string;
+  /** 该槽位/题目满分；缺省时使用考试默认分值 */
+  point?: number;
+}
+
+export interface ExamConfigDto {
+  id: string;
+  examId: string;
+  slotCount: number;
+  defaultPoint: number;
+  gap: number;
+  titleMapping: ExamConfigTitleDto[] | null;
+  updatedAt: string;
+}
+
+export interface ExamDto {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ExamStatus;
+  createdById: string;
+  createdByName: string | null;
+  publishedAt: string | null;
+  closedAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  config: ExamConfigDto | null;
+}
+
+export interface ExamListDto {
+  items: ExamDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface StudentDto {
+  id: string;
+  ownerId: string;
+  ownerName: string | null;
+  ownerSchoolName: string | null;
+  name: string;
+  schoolId: string | null;
+  schoolName: string | null;
+  gradeId: string | null;
+  gradeName: string | null;
+  prizeId: string | null;
+  prizeName: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentListDto {
+  items: StudentDto[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

@@ -60,8 +60,10 @@ export function AuditLogsList() {
         <Space direction="vertical" size={0}>
           {r.targetUserId && <span>账号 #{r.targetUserId}</span>}
           {r.applicationId && <span>申请 #{r.applicationId}</span>}
+          {r.examId && <span>考试 #{r.examId}</span>}
+          {r.studentId && <span>学生 #{r.studentId}</span>}
           {r.legacyMemberId && <span>旧账号 #{r.legacyMemberId}</span>}
-          {!r.targetUserId && !r.applicationId && !r.legacyMemberId && '-'}
+          {!r.targetUserId && !r.applicationId && !r.examId && !r.studentId && !r.legacyMemberId && '-'}
         </Space>
       ),
       width: 140,

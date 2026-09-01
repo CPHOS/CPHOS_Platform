@@ -498,6 +498,8 @@ export async function listLogs(options: {
     operatorName: nameMap.get(String(r.operatorId)) ?? null,
     legacyMemberId: r.legacyMemberId === null ? null : String(r.legacyMemberId),
     targetUserId: r.targetUserId === null ? null : String(r.targetUserId),
+    examId: r.examId === null ? null : String(r.examId),
+    studentId: r.studentId === null ? null : String(r.studentId),
     remark: r.remark,
     createdAt: r.createdAt.toISOString(),
   }));
