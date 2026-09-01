@@ -270,6 +270,10 @@ export async function createPaper(
     const paper = await prisma.$transaction(async (tx) => {
       // 同考试上传串行化，防止并发绕过个人/团队共享限额
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
+      const freshExam = await tx.exam.findUnique({ where: { id: examId }, select: { status: true } });
+      if (!freshExam || freshExam.status !== 'PUBLISHED') {
+        throw Errors.validation('考试已非进行中状态，不能创建整卷');
+      }
       const quotaWhere = profile.teamId
         ? { examId, uploadedBy: { teamId: profile.teamId } }
         : { examId, uploadedById: profile.id };
@@ -444,6 +448,24 @@ export async function setPaperStatus(
     const missing = paper.questions.filter((q) => q.images.length === 0);
     if (missing.length > 0) {
       throw Errors.validation('仍有题目未绑定图片，不能标记就绪');
+    }
+  }
+  if (input.status === 'ARCHIVED') {
+    const activeTasks = await prisma.markingTask.count({
+      where: {
+        paperQuestion: { paperId },
+        status: 'PENDING',
+        allocation: { status: 'ACTIVE' },
+      },
+    });
+    const activeArbitrations = await prisma.arbitration.count({
+      where: {
+        status: { in: ['PENDING', 'CLAIMED'] },
+        paperQuestion: { paperId },
+      },
+    });
+    if (activeTasks > 0 || activeArbitrations > 0) {
+      throw Errors.validation('该卷仍有未完成阅卷/仲裁任务，不能归档');
     }
   }
 

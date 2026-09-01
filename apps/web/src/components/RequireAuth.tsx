@@ -1,4 +1,4 @@
-import { Spin } from 'antd';
+import { Button, Result, Spin } from 'antd';
 import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { homeFor, useAuthStore } from '../stores/auth';
@@ -21,6 +21,7 @@ const PUBLIC_PATHS = ['/login', '/register', '/verify-email'];
 export function RequireAuth({ kind, children }: RequireAuthProps) {
   const user = useAuthStore((s) => s.user);
   const booting = useAuthStore((s) => s.booting);
+  const bootError = useAuthStore((s) => s.bootError);
   const loadMe = useAuthStore((s) => s.loadMe);
   const location = useLocation();
 
@@ -38,6 +39,20 @@ export function RequireAuth({ kind, children }: RequireAuthProps) {
 
   if (!user) {
     if (PUBLIC_PATHS.includes(location.pathname)) return <>{children}</>;
+    if (bootError) {
+      return (
+        <Result
+          status="warning"
+          title="无法连接服务器"
+          subTitle="会话恢复失败，请检查网络后重试。"
+          extra={
+            <Button type="primary" onClick={() => void loadMe()}>
+              重试
+            </Button>
+          }
+        />
+      );
+    }
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 

@@ -56,6 +56,7 @@ export async function gradeMarkingTask(
   if (task.status !== 'PENDING') throw Errors.validation('该任务已完成或已取消');
   if (task.allocation?.status !== 'ACTIVE') throw Errors.validation('分配批次已撤销，任务不可评分');
   if (task.paperQuestion.paper.finalizedAt) throw Errors.validation('整卷已定稿，不可再评分');
+  if (task.paperQuestion.paper.status === 'ARCHIVED') throw Errors.validation('整卷已归档，不可再评分');
   if (task.paperQuestion.paper.exam.status !== 'PUBLISHED') {
     throw Errors.validation('考试非进行中状态，不可评分');
   }
@@ -171,6 +172,19 @@ export async function listArbitrations(
               orderBy: { roundNo: 'asc' },
               select: { score: true },
             },
+            images: {
+              orderBy: { partIndex: 'asc' },
+              select: {
+                id: true,
+                paperQuestionId: true,
+                paperPageId: true,
+                partIndex: true,
+                crop: true,
+                fileKey: true,
+                createdAt: true,
+                paperPage: { select: { pageNo: true, fileKey: true } },
+              },
+            },
           },
         },
       },
@@ -192,6 +206,17 @@ export async function listArbitrations(
     claimedByName: userName(a.claimedBy),
     score: a.score === null ? null : Number(a.score),
     roundScores: a.paperQuestion.markingTasks.map((t) => (t.score === null ? null : Number(t.score))),
+    images: a.paperQuestion.images.map((image) => ({
+      id: String(image.id),
+      paperQuestionId: String(image.paperQuestionId),
+      paperPageId: String(image.paperPageId),
+      partIndex: image.partIndex,
+      crop: (image.crop as { x: number; y: number; width: number; height: number } | null) ?? null,
+      fileKey: image.fileKey,
+      pageNo: image.paperPage.pageNo,
+      pageFileKey: image.paperPage.fileKey,
+      createdAt: image.createdAt.toISOString(),
+    })),
     remark: a.remark,
     createdAt: a.createdAt.toISOString(),
     completedAt: a.completedAt?.toISOString() ?? null,

@@ -222,6 +222,10 @@ export async function createAllocation(
 
   const batch = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
+    const freshExam = await tx.exam.findUnique({ where: { id: examId }, select: { status: true } });
+    if (!freshExam || freshExam.status !== 'PUBLISHED') {
+      throw Errors.validation('考试已非进行中状态，不能分配');
+    }
     const active = await tx.allocationBatch.findFirst({ where: { examId, status: 'ACTIVE' } });
     if (active) throw Errors.validation('该考试已有生效中的分配批次');
     const created = await tx.allocationBatch.create({
@@ -281,22 +285,31 @@ export async function revokeBatch(id: bigint, operatorId: bigint): Promise<Alloc
       data: { status: 'REVOKED', revokedAt: new Date() },
     });
     if (changed.count !== 1) throw Errors.validation('该批次已撤销');
-    await tx.markingTask.updateMany({
-      where: { allocationId: id, status: 'PENDING' },
-      data: { status: 'CANCELED' },
-    });
     const affected = await tx.markingTask.findMany({
       where: { allocationId: id },
       select: {
         paperQuestionId: true,
-        paperQuestion: { select: { paperId: true, paper: { select: { finalizedAt: true } } } },
+        paperQuestion: { select: { paperId: true } },
       },
     });
-    if (affected.some((a) => a.paperQuestion.paper.finalizedAt)) {
+    const questionIds = [...new Set(affected.map((a) => a.paperQuestionId))];
+    const paperIds = [...new Set(affected.map((a) => a.paperQuestion.paperId))].sort((a, b) =>
+      a < b ? -1 : 1,
+    );
+    // 与阅卷/仲裁终审保持一致的 Paper 行锁，防止检查后被并发定稿
+    for (const paperId of paperIds) {
+      await tx.$executeRaw`SELECT id FROM "Paper" WHERE "id" = ${paperId} FOR UPDATE`;
+    }
+    const finalizedCount = paperIds.length
+      ? await tx.paper.count({ where: { id: { in: paperIds }, finalizedAt: { not: null } } })
+      : 0;
+    if (finalizedCount > 0) {
       throw Errors.validation('该批次包含已定稿整卷，禁止撤销；如需重阅请走专门流程');
     }
-    const questionIds = [...new Set(affected.map((a) => a.paperQuestionId))];
-    const paperIds = [...new Set(affected.map((a) => a.paperQuestion.paperId))];
+    await tx.markingTask.updateMany({
+      where: { allocationId: id, status: 'PENDING' },
+      data: { status: 'CANCELED' },
+    });
     if (questionIds.length > 0) {
       await tx.arbitration.updateMany({
         where: { paperQuestionId: { in: questionIds }, status: { not: 'COMPLETED' } },
@@ -360,6 +373,19 @@ export async function listMyMarkingTasks(
             slot: true,
             questionLabel: true,
             maxScore: true,
+            images: {
+              orderBy: { partIndex: 'asc' },
+              select: {
+                id: true,
+                paperQuestionId: true,
+                paperPageId: true,
+                partIndex: true,
+                crop: true,
+                fileKey: true,
+                createdAt: true,
+                paperPage: { select: { pageNo: true, fileKey: true } },
+              },
+            },
             paper: {
               select: {
                 id: true,
@@ -389,6 +415,17 @@ export async function listMyMarkingTasks(
     score: task.score === null ? null : Number(task.score),
     assigneeId: String(task.assigneeId),
     assigneeName: personName(task.assignee),
+    images: task.paperQuestion.images.map((image) => ({
+      id: String(image.id),
+      paperQuestionId: String(image.paperQuestionId),
+      paperPageId: String(image.paperPageId),
+      partIndex: image.partIndex,
+      crop: (image.crop as { x: number; y: number; width: number; height: number } | null) ?? null,
+      fileKey: image.fileKey,
+      pageNo: image.paperPage.pageNo,
+      pageFileKey: image.paperPage.fileKey,
+      createdAt: image.createdAt.toISOString(),
+    })),
     createdAt: task.createdAt.toISOString(),
   }));
   return { items, total, page: query.page, pageSize: query.pageSize };

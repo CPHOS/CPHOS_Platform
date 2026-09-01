@@ -9,6 +9,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { arbitrationApi } from '../../api/marking';
 import { apiErrorMessage } from '../../api/http';
+import { AnswerImage } from '../../components/AnswerImage';
 import { useAuthStore } from '../../stores/auth';
 
 const STATUS_COLORS: Record<ArbitrationStatus, string> = {
@@ -153,7 +154,22 @@ export function ArbitrationPage() {
         onOk={() => void submitGrade()}
         confirmLoading={saving}
         destroyOnClose
+        width={760}
       >
+        {grading && grading.images.length > 0 && (
+          <Space wrap style={{ marginBottom: 16, maxHeight: 260, overflow: 'auto' }}>
+            {grading.images.map((image) => (
+              <AnswerImage
+                key={image.id}
+                imageKey={grading.id + ':' + image.id}
+                load={() => arbitrationApi.image(grading.id, image.paperPageId)}
+                pageNo={image.pageNo}
+                partIndex={image.partIndex}
+                crop={image.crop}
+              />
+            ))}
+          </Space>
+        )}
         <Form form={form} layout="vertical">
           <Form.Item name="score" label="仲裁分" rules={[{ required: true, message: '请输入仲裁分' }]}>
             <InputNumber min={0} max={grading?.maxScore ?? 10000} step={0.5} style={{ width: '100%' }} />

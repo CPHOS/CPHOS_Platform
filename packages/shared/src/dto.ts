@@ -425,6 +425,7 @@ export interface MarkingTaskDto {
   score: number | null;
   assigneeId: string;
   assigneeName: string | null;
+  images: QuestionImageDto[];
   createdAt: string;
 }
 
@@ -450,6 +451,7 @@ export interface ArbitrationDto {
   claimedByName: string | null;
   score: number | null;
   roundScores: (number | null)[];
+  images: QuestionImageDto[];
   remark: string | null;
   createdAt: string;
   completedAt: string | null;

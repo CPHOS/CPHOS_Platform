@@ -193,23 +193,32 @@ export async function publishExam(id: bigint, operatorId: bigint): Promise<ExamD
 }
 
 export async function closeExam(id: bigint, operatorId: bigint): Promise<ExamDto> {
-  const exam = await findExamOrThrow(id);
-  if (exam.status !== 'PUBLISHED') throw Errors.validation('仅已发布考试可结束');
-  const pendingTasks = await prisma.markingTask.count({
-    where: { allocation: { examId: id }, status: 'PENDING' },
-  });
-  if (pendingTasks > 0) throw Errors.validation('仍有 ' + pendingTasks + ' 个阅卷任务未完成，不能结束考试');
-  const pendingArbitrations = await prisma.arbitration.count({
-    where: {
-      status: { in: ['PENDING', 'CLAIMED'] },
-      paperQuestion: { paper: { examId: id } },
-    },
-  });
-  if (pendingArbitrations > 0) {
-    throw Errors.validation('仍有 ' + pendingArbitrations + ' 个仲裁任务未完成，不能结束考试');
-  }
-
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
+    const exam = await tx.exam.findUnique({ where: { id }, select: { status: true } });
+    if (!exam) throw Errors.notFound('考试');
+    if (exam.status !== 'PUBLISHED') throw Errors.validation('仅已发布考试可结束');
+
+    const pendingTasks = await tx.markingTask.count({
+      where: { allocation: { examId: id }, status: 'PENDING' },
+    });
+    if (pendingTasks > 0) throw Errors.validation('仍有 ' + pendingTasks + ' 个阅卷任务未完成，不能结束考试');
+    const pendingArbitrations = await tx.arbitration.count({
+      where: {
+        status: { in: ['PENDING', 'CLAIMED'] },
+        paperQuestion: { paper: { examId: id } },
+      },
+    });
+    if (pendingArbitrations > 0) {
+      throw Errors.validation('仍有 ' + pendingArbitrations + ' 个仲裁任务未完成，不能结束考试');
+    }
+    const unfinalized = await tx.paper.count({
+      where: { examId: id, finalizedAt: null, status: { not: 'ARCHIVED' } },
+    });
+    if (unfinalized > 0) {
+      throw Errors.validation('仍有 ' + unfinalized + ' 份有效整卷未定稿，不能结束考试');
+    }
+
     const changed = await tx.exam.updateMany({
       where: { id, status: 'PUBLISHED' },
       data: { status: 'CLOSED', closedAt: new Date() },
@@ -221,12 +230,17 @@ export async function closeExam(id: bigint, operatorId: bigint): Promise<ExamDto
 }
 
 export async function archiveExam(id: bigint, operatorId: bigint): Promise<ExamDto> {
-  const exam = await findExamOrThrow(id);
-  if (exam.status !== 'CLOSED') throw Errors.validation('仅已结束考试可归档');
-  const unfinalized = await prisma.paper.count({ where: { examId: id, finalizedAt: null } });
-  if (unfinalized > 0) throw Errors.validation('仍有 ' + unfinalized + ' 份整卷未定稿，不能归档');
-
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
+    const exam = await tx.exam.findUnique({ where: { id }, select: { status: true } });
+    if (!exam) throw Errors.notFound('考试');
+    if (exam.status !== 'CLOSED') throw Errors.validation('仅已结束考试可归档');
+    // 用户主动归档的放弃卷不阻塞整场考试归档
+    const unfinalized = await tx.paper.count({
+      where: { examId: id, finalizedAt: null, status: { not: 'ARCHIVED' } },
+    });
+    if (unfinalized > 0) throw Errors.validation('仍有 ' + unfinalized + ' 份整卷未定稿，不能归档');
+
     const changed = await tx.exam.updateMany({
       where: { id, status: 'CLOSED' },
       data: { status: 'ARCHIVED', archivedAt: new Date() },

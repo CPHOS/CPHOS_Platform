@@ -50,16 +50,18 @@ export const authPlugin = fp(
         req.user = { sub: String(bot.id), email: bot.email };
         return;
       }
+      let payload: { sub: string; email: string | null; tv: number };
       try {
-        const payload = await req.jwtVerify<{ sub: string; email: string | null; tv: number }>();
-        const user = await prisma.userAccount.findUnique({
-          where: { id: BigInt(payload.sub) },
-          select: { tokenVersion: true, status: true },
-        });
-        if (!user || user.tokenVersion !== payload.tv || user.status === 'DISABLED') {
-          throw Errors.unauthorized();
-        }
+        payload = await req.jwtVerify<{ sub: string; email: string | null; tv: number }>();
       } catch {
+        throw Errors.unauthorized();
+      }
+      // 数据库错误必须向上抛（500/503），不能被伪装成 401 触发前端登出
+      const user = await prisma.userAccount.findUnique({
+        where: { id: BigInt(payload.sub) },
+        select: { tokenVersion: true, status: true },
+      });
+      if (!user || user.tokenVersion !== payload.tv || user.status === 'DISABLED') {
         throw Errors.unauthorized();
       }
     });

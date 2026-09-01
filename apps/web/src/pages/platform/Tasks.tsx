@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { tasksApi } from '../../api/allocation';
 import { apiErrorMessage } from '../../api/http';
 import { markingApi } from '../../api/marking';
+import { AnswerImage } from '../../components/AnswerImage';
 
 const STATUS_COLORS: Record<MarkingTaskStatus, string> = {
   PENDING: 'processing',
@@ -126,7 +127,22 @@ export function TasksPage() {
         onOk={() => void submitGrade()}
         confirmLoading={saving}
         destroyOnClose
+        width={760}
       >
+        {grading && grading.images.length > 0 && (
+          <Space wrap style={{ marginBottom: 16, maxHeight: 260, overflow: 'auto' }}>
+            {grading.images.map((image) => (
+              <AnswerImage
+                key={image.id}
+                imageKey={grading.id + ':' + image.id}
+                load={() => markingApi.taskImage(grading.id, image.paperPageId)}
+                pageNo={image.pageNo}
+                partIndex={image.partIndex}
+                crop={image.crop}
+              />
+            ))}
+          </Space>
+        )}
         <Form form={form} layout="vertical">
           <Form.Item name="score" label="得分" rules={[{ required: true, message: '请输入得分' }]}>
             <InputNumber min={0} max={grading?.maxScore ?? 10000} step={0.5} style={{ width: '100%' }} />

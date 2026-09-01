@@ -81,6 +81,13 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
     });
   }
 
+  // 有未定稿整卷时不能结束考试
+  const closeUnfinalized = await request.post('/api/admin/exams/' + exam.id + '/close', {
+    headers: adminAuth,
+    data: {},
+  });
+  expect(closeUnfinalized.status()).toBe(400);
+
   // C3 撤销后必须可再次分配
   const first = await request.post('/api/admin/exams/' + exam.id + '/allocation', { headers: adminAuth, data: {} });
   expect(first.ok()).toBeTruthy();
