@@ -473,4 +473,3 @@ export async function getPaperPageStream(
   if (!existsSync(absolutePath)) throw Errors.notFound('文件');
   return { stream: createReadStream(absolutePath), mimeType: page.mimeType ?? 'application/octet-stream' };
 }
-
