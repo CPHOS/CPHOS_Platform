@@ -11,6 +11,7 @@ export const E2E_ACCOUNTS = {
   member: { loginName: 'e2e_member', displayName: 'E2E 内部成员', password: 'E2eMember123!' },
   coach: { email: 'e2e.coach@example.com', displayName: 'E2E 教练甲', password: 'E2eCoach123!' },
   coach2: { email: 'e2e.coach2@example.com', displayName: 'E2E 教练乙', password: 'E2eCoach123!' },
+  rankCoach: { email: 'e2e.rank.coach@example.com', displayName: 'E2E 排名教练', password: 'E2eRankCoach123!' },
   reset: { email: 'e2e.reset@example.com', displayName: 'E2E 重置用户', password: 'E2eReset123!' },
   email: { email: 'e2e.email@example.com', displayName: 'E2E 换绑用户', password: 'E2eEmail123!' },
 } as const;
@@ -83,7 +84,8 @@ async function main() {
       realName: '教练甲',
       schoolId: school.id,
       role: 'LEADER',
-      defaultSlot: 1,
+      // M3 排名/成绩专用 rankCoach 占用槽位1；普通教练默认不参与自动分配
+      defaultSlot: 9,
       uploadLimit: 100,
       auditStatus: 1,
     },
@@ -106,6 +108,28 @@ async function main() {
       schoolId: school.id,
       role: 'LEADER',
       defaultSlot: 2,
+      uploadLimit: 100,
+      auditStatus: 1,
+    },
+  });
+
+  const rankCoach = await prisma.userAccount.create({
+    data: {
+      email: E2E_ACCOUNTS.rankCoach.email,
+      displayName: E2E_ACCOUNTS.rankCoach.displayName,
+      emailVerifiedAt: new Date(),
+      passwordHash: await hashPassword(E2E_ACCOUNTS.rankCoach.password),
+      role: 'PLATFORM_USER',
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.memberProfile.create({
+    data: {
+      userId: rankCoach.id,
+      realName: '排名教练',
+      schoolId: school.id,
+      role: 'LEADER',
+      defaultSlot: 1,
       uploadLimit: 100,
       auditStatus: 1,
     },

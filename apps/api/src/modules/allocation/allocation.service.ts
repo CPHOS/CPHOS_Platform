@@ -78,8 +78,12 @@ async function findBatchOrThrow(id: bigint): Promise<BatchWithRelations> {
 }
 
 export async function previewAllocation(examId: bigint): Promise<AllocationPreviewDto> {
-  const exam = await prisma.exam.findUnique({ where: { id: examId }, select: { id: true, name: true } });
+  const exam = await prisma.exam.findUnique({
+    where: { id: examId },
+    select: { id: true, name: true, status: true },
+  });
   if (!exam) throw Errors.notFound('考试');
+  if (exam.status !== 'PUBLISHED') throw Errors.validation('仅已发布考试可分配');
 
   const papers = await prisma.paper.findMany({
     where: { examId, status: 'READY' },
@@ -150,9 +154,6 @@ export async function createAllocation(
   if (preview.unassignedSlots.length > 0) {
     throw Errors.validation('以下槽位没有可用阅卷成员：' + preview.unassignedSlots.join(', '));
   }
-  const active = await prisma.allocationBatch.findFirst({ where: { examId, status: 'ACTIVE' } });
-  if (active) throw Errors.validation('该考试已有生效中的分配批次');
-
   const papers = await prisma.paper.findMany({ where: { examId, status: 'READY' }, select: { id: true } });
   const paperIds = papers.map((p) => p.id);
   const questions = await prisma.paperQuestion.findMany({
@@ -204,6 +205,9 @@ export async function createAllocation(
   }
 
   const batch = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
+    const active = await tx.allocationBatch.findFirst({ where: { examId, status: 'ACTIVE' } });
+    if (active) throw Errors.validation('该考试已有生效中的分配批次');
     const created = await tx.allocationBatch.create({
       data: { examId, createdById: operatorId, note: input.note ?? null },
     });
@@ -256,10 +260,11 @@ export async function revokeBatch(id: bigint, operatorId: bigint): Promise<Alloc
   const batch = await findBatchOrThrow(id);
   if (batch.status !== 'ACTIVE') throw Errors.validation('该批次不是生效中状态');
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.allocationBatch.update({
-      where: { id },
+    const changed = await tx.allocationBatch.updateMany({
+      where: { id, status: 'ACTIVE' },
       data: { status: 'REVOKED', revokedAt: new Date() },
     });
+    if (changed.count !== 1) throw Errors.validation('该批次已撤销');
     await tx.markingTask.updateMany({
       where: { allocationId: id, status: 'PENDING' },
       data: { status: 'CANCELED' },
@@ -285,6 +290,7 @@ export async function listMyMarkingTasks(
   if (!profile) throw Errors.forbidden();
   const where: Prisma.MarkingTaskWhereInput = {
     assigneeId: profile.id,
+    allocation: { status: 'ACTIVE' },
     ...(query.status ? { status: query.status } : {}),
     ...(query.examId ? { paperQuestion: { paper: { examId: BigInt(query.examId) } } } : {}),
   };

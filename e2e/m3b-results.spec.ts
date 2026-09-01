@@ -20,13 +20,6 @@ async function apiLogin(request: any, account: string, password: string): Promis
   return (await res.json()).accessToken as string;
 }
 
-async function memberId(request: any, adminAuth: any, q: string): Promise<string> {
-  const res = await request.get('/api/admin/members', { headers: adminAuth, params: { q, pageSize: 5 } });
-  const body = await res.json();
-  expect(body.items.length).toBeGreaterThan(0);
-  return body.items[0].userId as string;
-}
-
 test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
   test.setTimeout(180_000);
   const suffix = String(Date.now()).slice(-6);
@@ -35,10 +28,6 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
 
   const adminToken = await apiLogin(request, ACCOUNTS.admin.account, ACCOUNTS.admin.password);
   const adminAuth = { Authorization: 'Bearer ' + adminToken };
-  const coach1 = await memberId(request, adminAuth, ACCOUNTS.coach.account);
-  const coach2 = await memberId(request, adminAuth, ACCOUNTS.coach2.account);
-  await request.patch('/api/admin/members/' + coach1, { headers: adminAuth, data: { defaultSlot: 9 } });
-  await request.patch('/api/admin/members/' + coach2, { headers: adminAuth, data: { defaultSlot: 1 } });
 
   const exam = await request
     .post('/api/admin/exams', { headers: adminAuth, data: { name: examName } })
@@ -49,7 +38,7 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
   });
   await request.post('/api/admin/exams/' + exam.id + '/publish', { headers: adminAuth, data: {} });
 
-  const coachToken = await apiLogin(request, ACCOUNTS.coach2.account, ACCOUNTS.coach2.password);
+  const coachToken = await apiLogin(request, ACCOUNTS.rankCoach.account, ACCOUNTS.rankCoach.password);
   const coachAuth = { Authorization: 'Bearer ' + coachToken };
   const student = await request
     .post('/api/students', { headers: coachAuth, data: { name: studentName } })
@@ -79,7 +68,7 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
   await request.post('/api/tasks/' + myTasks[0].id + '/grade', { headers: coachAuth, data: { score: 8 } });
   await request.post('/api/tasks/' + myTasks[1].id + '/grade', { headers: coachAuth, data: { score: 10 } });
 
-  await login(page, ACCOUNTS.coach2.account, ACCOUNTS.coach2.password);
+  await login(page, ACCOUNTS.rankCoach.account, ACCOUNTS.rankCoach.password);
   await page.goto('/app/results');
   await expect(page.getByRole('cell', { name: examName }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '1/1' }).first()).toBeVisible();

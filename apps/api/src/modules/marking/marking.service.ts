@@ -20,7 +20,10 @@ async function recomputePaper(tx: Prisma.TransactionClient, paperId: bigint): Pr
     select: { finalScore: true },
   });
   const allFinal = questions.length > 0 && questions.every((q) => q.finalScore !== null);
-  const total = questions.reduce((sum, q) => sum + (q.finalScore ? Number(q.finalScore) : 0), 0);
+  let total = new Prisma.Decimal(0);
+  for (const q of questions) {
+    if (q.finalScore !== null) total = total.plus(q.finalScore);
+  }
   await tx.paper.update({
     where: { id: paperId },
     data: {
@@ -41,6 +44,7 @@ export async function gradeMarkingTask(
   const task = await prisma.markingTask.findUnique({
     where: { id: taskId },
     include: {
+      allocation: { select: { status: true } },
       paperQuestion: {
         include: {
           paper: { include: { exam: { include: { config: true } } } },
@@ -50,11 +54,17 @@ export async function gradeMarkingTask(
   });
   if (!task || task.assigneeId !== profile.id) throw Errors.notFound('阅卷任务');
   if (task.status !== 'PENDING') throw Errors.validation('该任务已完成或已取消');
+  if (task.allocation?.status !== 'ACTIVE') throw Errors.validation('分配批次已撤销，任务不可评分');
+  if (task.paperQuestion.paper.exam.status !== 'PUBLISHED') {
+    throw Errors.validation('考试非进行中状态，不可评分');
+  }
   if (input.score > Number(task.paperQuestion.maxScore)) {
     throw Errors.validation('分数不能超过题目满分');
   }
 
   await prisma.$transaction(async (tx) => {
+    // 整卷级串行化：阅卷完成判定与总分重算不会交错在半可见状态上
+    await tx.$executeRaw`SELECT id FROM "Paper" WHERE "id" = ${task.paperQuestion.paper.id} FOR UPDATE`;
     const changed = await tx.markingTask.updateMany({
       where: { id: taskId, assigneeId: profile.id, status: 'PENDING' },
       data: {
@@ -75,9 +85,17 @@ export async function gradeMarkingTask(
         remark: input.remark ?? null,
       },
     });
+    await tx.auditLog.create({
+      data: {
+        operatorId: userId,
+        action: 'MARK_TASK_GRADE',
+        examId: task.paperQuestion.paper.examId,
+        remark: '阅卷任务 #' + taskId + ' 得分 ' + input.score,
+      },
+    });
 
     const tasks = await tx.markingTask.findMany({
-      where: { paperQuestionId: task.paperQuestionId },
+      where: { paperQuestionId: task.paperQuestionId, allocation: { status: 'ACTIVE' } },
       select: { id: true, roundNo: true, score: true, status: true },
     });
     if (tasks.length === 2 && tasks.every((t) => t.status === 'COMPLETED')) {
@@ -92,6 +110,14 @@ export async function gradeMarkingTask(
           where: { paperQuestionId: task.paperQuestionId },
           create: { paperQuestionId: task.paperQuestionId, status: 'PENDING' },
           update: { status: 'PENDING', score: null, claimedById: null, completedAt: null },
+        });
+        await tx.auditLog.create({
+          data: {
+            operatorId: userId,
+            action: 'ARBITRATION_CREATE',
+            examId: task.paperQuestion.paper.examId,
+            remark: '题目 #' + task.paperQuestionId + ' 分差超过阈值，生成仲裁',
+          },
         });
         await tx.paperQuestion.update({
           where: { id: task.paperQuestionId },
@@ -168,11 +194,21 @@ export async function listArbitrations(
 }
 
 export async function claimArbitration(userId: bigint, id: bigint): Promise<void> {
+  const existing = await prisma.arbitration.findUnique({
+    where: { id },
+    include: { paperQuestion: { include: { paper: { select: { exam: { select: { status: true } } } } } } },
+  });
+  if (!existing) throw Errors.notFound('仲裁任务');
+  if (existing.status === 'COMPLETED' || existing.status === 'CANCELED') {
+    throw Errors.validation('仲裁任务已完成或已取消');
+  }
+  if (existing.claimedById === userId) return;
+  if (existing.claimedById) throw Errors.forbidden();
+  if (existing.paperQuestion.paper.exam.status !== 'PUBLISHED') {
+    throw Errors.validation('考试非进行中状态，不可认领');
+  }
   const changed = await prisma.arbitration.updateMany({
-    where: {
-      id,
-      OR: [{ status: 'PENDING' }, { status: 'CLAIMED', claimedById: userId }],
-    },
+    where: { id, status: 'PENDING', claimedById: null },
     data: { status: 'CLAIMED', claimedById: userId },
   });
   if (changed.count !== 1) throw Errors.validation('仲裁任务已被他人认领或已完成');
@@ -188,11 +224,17 @@ export async function gradeArbitration(
 ): Promise<void> {
   const arbitration = await prisma.arbitration.findUnique({
     where: { id },
-    include: { paperQuestion: true },
+    include: { paperQuestion: { include: { paper: { select: { id: true, exam: { select: { status: true } }, finalizedAt: true } } } } },
   });
   if (!arbitration) throw Errors.notFound('仲裁任务');
   if (arbitration.status === 'COMPLETED' || arbitration.status === 'CANCELED') {
     throw Errors.validation('仲裁任务已完成或已取消');
+  }
+  if (arbitration.paperQuestion.paper.finalizedAt) {
+    throw Errors.validation('整卷已定稿，不可再仲裁');
+  }
+  if (arbitration.paperQuestion.paper.exam.status !== 'PUBLISHED') {
+    throw Errors.validation('考试非进行中状态，不可仲裁');
   }
   if (arbitration.claimedById && arbitration.claimedById !== userId) {
     throw Errors.forbidden();
@@ -202,8 +244,13 @@ export async function gradeArbitration(
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT id FROM "Paper" WHERE "id" = ${arbitration.paperQuestion.paper.id} FOR UPDATE`;
     const changed = await tx.arbitration.updateMany({
-      where: { id, status: { in: ['PENDING', 'CLAIMED'] } },
+      where: {
+        id,
+        status: { in: ['PENDING', 'CLAIMED'] },
+        OR: [{ claimedById: null }, { claimedById: userId }],
+      },
       data: {
         status: 'COMPLETED',
         claimedById: userId,

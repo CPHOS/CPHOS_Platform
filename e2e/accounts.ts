@@ -5,6 +5,7 @@ export const ACCOUNTS = {
   member: { account: 'e2e_member', password: 'E2eMember123!' },
   coach: { account: 'e2e.coach@example.com', password: 'E2eCoach123!' },
   coach2: { account: 'e2e.coach2@example.com', password: 'E2eCoach123!' },
+  rankCoach: { account: 'e2e.rank.coach@example.com', password: 'E2eRankCoach123!' },
   reset: { account: 'e2e.reset@example.com', password: 'E2eReset123!' },
   email: { account: 'e2e.email@example.com', password: 'E2eEmail123!' },
 } as const;

@@ -329,6 +329,9 @@ export function AccountsList() {
         open={!!botToken}
         onCancel={() => setBotToken(null)}
         footer={<Button type="primary" onClick={() => setBotToken(null)}>我已保存</Button>}
+        maskClosable={false}
+        keyboard={false}
+        closable={false}
         destroyOnClose
       >
         <Alert

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { AppError } from '../lib/errors.js';
@@ -15,6 +16,14 @@ export function installErrorHandler(app: FastifyInstance): void {
           code: ERROR_CODES.VALIDATION,
           message: err.issues.map((i) => i.message).join('；'),
         });
+      }
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === 'P2002') {
+          return reply.code(409).send({ code: 'CONFLICT', message: '数据已存在或状态冲突' });
+        }
+        if (err.code === 'P2003') {
+          return reply.code(400).send({ code: ERROR_CODES.VALIDATION, message: '关联数据不存在或仍被引用' });
+        }
       }
       const statusCode = (err as { statusCode?: number }).statusCode;
       if (statusCode === 429) {

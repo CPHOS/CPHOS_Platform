@@ -1,17 +1,26 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+// 显式加载 apps/api/.env（相对本文件 src 或 dist 的上一级）
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env'), quiet: true });
 
 /** 公开的开发默认值：仅允许非生产环境使用，生产必须显式覆盖 */
 export const INSECURE_JWT_DEFAULT = 'dev-secret-change-me-0123456789abcdef';
 export const INSECURE_CODE_SALT_DEFAULT = 'dev-code-salt-change-me';
+const DEV_DATABASE_DEFAULT = 'postgresql://cphos:cphos@127.0.0.1:54329/cphos';
+const DEV_CORS_DEFAULT = 'http://localhost:5173';
+const DEV_SMTP_FROM = 'CPHOS 平台 <no-reply@cphos.example>';
 
 const schema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().default(3001),
+    // 生产建议 127.0.0.1（仅允许 Nginx 反代访问）；容器可覆盖 0.0.0.0
+    HOST: z.string().default('0.0.0.0'),
     // 开发默认连接 scripts/dev-db.mjs 启动的内嵌 PostgreSQL；生产请覆盖为正式实例
-    DATABASE_URL: z
-      .string()
-      .default('postgresql://cphos:cphos@127.0.0.1:54329/cphos'),
+    DATABASE_URL: z.string().default(DEV_DATABASE_DEFAULT),
     JWT_SECRET: z.string().min(16).default(INSECURE_JWT_DEFAULT),
     ACCESS_TOKEN_TTL: z.string().default('15m'),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(30),
@@ -21,6 +30,7 @@ const schema = z
     // 本地开发文件存储；生产应替换为对象存储适配器
     UPLOAD_DIR: z.string().default('.uploads'),
     UPLOAD_MAX_MB: z.coerce.number().default(20),
+    PAPER_MAX_PAGES: z.coerce.number().default(50),
     BODY_LIMIT_MB: z.coerce.number().default(1),
     TRUST_PROXY: z.preprocess(
       (v) => (v === undefined ? undefined : v === true || v === 'true' || v === '1'),
@@ -37,7 +47,7 @@ const schema = z
     ),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
-    SMTP_FROM: z.string().default('CPHOS 平台 <no-reply@cphos.example>'),
+    SMTP_FROM: z.string().default(DEV_SMTP_FROM),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') return;
@@ -64,11 +74,40 @@ const schema = z
         message: '生产环境 JWT_SECRET 与 CODE_SALT 必须使用不同的值',
       });
     }
-    if (!value.SMTP_HOST || !value.SMTP_FROM) {
+    if (!value.SMTP_HOST) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['SMTP_HOST'],
-        message: '生产环境必须配置 SMTP_HOST 与 SMTP_FROM，禁止使用 .devmail 文件兜底',
+        message: '生产环境必须配置 SMTP_HOST，禁止使用 .devmail 文件兜底',
+      });
+    }
+
+    if (value.DATABASE_URL === DEV_DATABASE_DEFAULT || value.DATABASE_URL.includes('127.0.0.1:54329')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DATABASE_URL'],
+        message: '生产环境禁止使用开发内嵌数据库默认连接串',
+      });
+    }
+    if (value.CORS_ORIGIN === DEV_CORS_DEFAULT || value.CORS_ORIGIN.startsWith('http://localhost')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CORS_ORIGIN'],
+        message: '生产环境必须显式配置正式前端域名',
+      });
+    }
+    if (!value.SMTP_FROM || value.SMTP_FROM === DEV_SMTP_FROM) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SMTP_FROM'],
+        message: '生产环境必须显式配置 SMTP_FROM，不能使用示例默认值',
+      });
+    }
+    if (Boolean(value.SMTP_USER) !== Boolean(value.SMTP_PASS)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SMTP_USER'],
+        message: '生产环境 SMTP_USER 与 SMTP_PASS 必须同时配置',
       });
     }
   });

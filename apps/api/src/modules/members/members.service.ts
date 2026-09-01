@@ -109,9 +109,11 @@ export async function getMember(userId: bigint): Promise<MemberDto> {
   return toMemberDto(m);
 }
 
-/** 角色切换前置检查（旧 API 行为）：变更前统计未完成任务；考试域未实现，暂留桩返回 0 */
-async function countIncompleteTasks(_userId: bigint): Promise<number> {
-  return 0;
+/** 角色/槽位切换前置检查：存在 ACTIVE 批次中的未完成阅卷任务则拒绝 */
+async function countIncompleteTasks(profileId: bigint): Promise<number> {
+  return prisma.markingTask.count({
+    where: { assigneeId: profileId, status: 'PENDING', allocation: { status: 'ACTIVE' } },
+  });
 }
 
 export async function updateMember(
@@ -127,10 +129,13 @@ export async function updateMember(
     throw Errors.validation('附属教练需先加入团队');
   }
 
-  if (input.role && input.role !== current.role) {
-    const incomplete = await countIncompleteTasks(userId);
+  if (
+    (input.role && input.role !== current.role) ||
+    (input.defaultSlot !== undefined && input.defaultSlot !== current.defaultSlot)
+  ) {
+    const incomplete = await countIncompleteTasks(current.id);
     if (incomplete > 0) {
-      throw Errors.validation('该成员尚有未完成的阅卷任务，暂不能切换角色');
+      throw Errors.validation('该成员尚有未完成的阅卷任务，暂不能切换角色/槽位');
     }
   }
 

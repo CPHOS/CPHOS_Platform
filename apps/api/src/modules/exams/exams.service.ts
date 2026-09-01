@@ -150,7 +150,7 @@ export async function upsertExamConfig(
   input: UpsertExamConfigInput,
 ): Promise<ExamDto> {
   const exam = await findExamOrThrow(id);
-  if (exam.status === 'ARCHIVED') throw Errors.validation('已归档考试不可改配置');
+  if (exam.status !== 'DRAFT') throw Errors.validation('仅草稿考试可修改配置（发布后请保持配置冻结）');
 
   await prisma.$transaction(async (tx) => {
     await tx.examConfig.upsert({
@@ -195,6 +195,10 @@ export async function publishExam(id: bigint, operatorId: bigint): Promise<ExamD
 export async function closeExam(id: bigint, operatorId: bigint): Promise<ExamDto> {
   const exam = await findExamOrThrow(id);
   if (exam.status !== 'PUBLISHED') throw Errors.validation('仅已发布考试可结束');
+  const pendingTasks = await prisma.markingTask.count({
+    where: { allocation: { examId: id }, status: 'PENDING' },
+  });
+  if (pendingTasks > 0) throw Errors.validation('仍有 ' + pendingTasks + ' 个阅卷任务未完成，不能结束考试');
 
   await prisma.$transaction(async (tx) => {
     const changed = await tx.exam.updateMany({
@@ -210,6 +214,8 @@ export async function closeExam(id: bigint, operatorId: bigint): Promise<ExamDto
 export async function archiveExam(id: bigint, operatorId: bigint): Promise<ExamDto> {
   const exam = await findExamOrThrow(id);
   if (exam.status !== 'CLOSED') throw Errors.validation('仅已结束考试可归档');
+  const unfinalized = await prisma.paper.count({ where: { examId: id, finalizedAt: null } });
+  if (unfinalized > 0) throw Errors.validation('仍有 ' + unfinalized + ' 份整卷未定稿，不能归档');
 
   await prisma.$transaction(async (tx) => {
     const changed = await tx.exam.updateMany({

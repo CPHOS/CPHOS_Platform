@@ -14,19 +14,36 @@ import { resultApi } from '../../api/results';
 
 function ResultImage({ paperId, image }: { paperId: string; image: QuestionImageDto }) {
   const [url, setUrl] = useState('');
+  const [error, setError] = useState(false);
   useEffect(() => {
     let alive = true;
-    void paperApi.pageImage(paperId, image.paperPageId).then((blob) => {
-      if (alive) setUrl(URL.createObjectURL(blob));
-    });
+    let objectUrl = '';
+    setUrl('');
+    setError(false);
+    void paperApi
+      .pageImage(paperId, image.paperPageId)
+      .then((blob) => {
+        if (!alive) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {
+        if (alive) setError(true);
+      });
     return () => {
       alive = false;
-      if (url) URL.revokeObjectURL(url);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [paperId, image.paperPageId]);
   return (
     <div style={{ width: 220 }}>
-      {url ? <img src={url} alt={'第' + image.pageNo + '页'} style={{ width: '100%' }} /> : <div>加载图片中</div>}
+      {url ? (
+        <img src={url} alt={'第' + image.pageNo + '页'} style={{ width: '100%' }} />
+      ) : (
+        <div style={{ height: 80, lineHeight: '80px', color: error ? '#c00' : undefined }}>
+          {error ? '图片加载失败' : '加载图片中'}
+        </div>
+      )}
       <Typography.Text type="secondary">
         第{image.pageNo}页 / 片段{image.partIndex}
         {image.crop

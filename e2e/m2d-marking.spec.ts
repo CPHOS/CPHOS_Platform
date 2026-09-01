@@ -44,7 +44,7 @@ test('M2-D 双阅打分、分差仲裁、最终分与 BOT 认证', async ({ page
   for (const pageNo of [1, 2]) {
     await request.post('/api/papers/' + paper.id + '/pages', {
       headers: coachAuth,
-      data: { pageNo, fileKey: 'e2e/p' + pageNo + '.png' },
+      data: { pageNo, fileKey: 'papers/' + paper.id + '/p' + pageNo + '.png' },
     });
   }
   const full = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());

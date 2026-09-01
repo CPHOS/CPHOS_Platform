@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import fp from 'fastify-plugin';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AccountRole, UserStatus } from '@cphos/shared';
@@ -38,7 +39,10 @@ export const authPlugin = fp(
           where: { loginName: botLogin.trim().toLowerCase(), role: 'BOT', status: 'ACTIVE' },
           select: { id: true, email: true, botTokenHash: true },
         });
-        if (!bot?.botTokenHash || bot.botTokenHash !== hashToken(botToken)) {
+        if (!bot?.botTokenHash) throw Errors.unauthorized();
+        const expected = Buffer.from(bot.botTokenHash, 'hex');
+        const actual = Buffer.from(hashToken(botToken), 'hex');
+        if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
           throw Errors.unauthorized();
         }
         req.user = { sub: String(bot.id), email: bot.email };

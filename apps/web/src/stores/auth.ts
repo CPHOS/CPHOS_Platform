@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { UserDto } from '@cphos/shared';
 import { authApi } from '../api/auth';
 import { setAccessToken } from '../api/http';
+import { queryClient } from '../api/queryClient';
 
 interface AuthState {
   user: UserDto | null;
@@ -19,6 +20,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   async login(account, password) {
     const { user, accessToken } = await authApi.login({ account, password });
+    queryClient.clear();
     setAccessToken(accessToken);
     set({ user, booting: false });
     return user;
@@ -29,9 +31,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await authApi.me();
       set({ user, booting: false });
       return user;
-    } catch {
-      setAccessToken(null);
-      set({ user: null, booting: false });
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401) {
+        setAccessToken(null);
+        set({ user: null, booting: false });
+      } else {
+        // 网络/5xx 不应误登出；保留当前用户并结束 booting，由页面重试
+        set({ booting: false });
+      }
       return null;
     }
   },
@@ -40,6 +48,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await authApi.logout();
     } finally {
+      queryClient.clear();
       setAccessToken(null);
       set({ user: null, booting: false });
     }

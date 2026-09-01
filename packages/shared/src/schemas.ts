@@ -327,9 +327,16 @@ export const createPaperSchema = z.object({
 });
 export type CreatePaperInput = z.infer<typeof createPaperSchema>;
 
+/** 服务端/受控上传键：只允许 papers/<数字>/<安全文件名> */
+export const storedFileKeySchema = z
+  .string()
+  .trim()
+  .max(300)
+  .regex(/^papers\/\d+\/[A-Za-z0-9._-]+$/, '文件键不合法');
+
 export const addPaperPageSchema = z.object({
   pageNo: z.number().int().min(1).max(1000),
-  fileKey: z.string().trim().min(1, '缺少文件键').max(500),
+  fileKey: storedFileKeySchema,
   mimeType: z.string().trim().max(100).optional(),
   sizeBytes: z.number().int().min(0).max(200 * 1024 * 1024).optional(),
 });
@@ -347,7 +354,7 @@ export const bindQuestionImageSchema = z.object({
   paperPageId: idSchema,
   partIndex: z.number().int().min(0).max(100).default(0),
   crop: cropSchema.optional(),
-  fileKey: z.string().trim().max(500).optional(),
+  fileKey: storedFileKeySchema.optional(),
 });
 export type BindQuestionImageInput = z.infer<typeof bindQuestionImageSchema>;
 

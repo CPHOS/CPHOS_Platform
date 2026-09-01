@@ -467,7 +467,8 @@ model MarkingTask {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  @@unique([paperQuestionId, roundNo])
+  // 同一题同一轮允许多次历史分配；仅当前 ACTIVE 批次的任务生效
+  @@index([paperQuestionId, roundNo])
   @@index([assigneeId, status])
   @@index([allocationId])
   @@index([paperQuestionId])

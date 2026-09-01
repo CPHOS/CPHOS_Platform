@@ -70,7 +70,9 @@ export async function getRanking(examId: bigint, rawSegments?: string): Promise<
 }
 
 function csvEscape(value: string | number | null): string {
-  const text = value === null ? '' : String(value);
+  let text = value === null ? '' : String(value);
+  // 防止 Excel/WPS 将用户可控单元格识别为公式
+  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 
@@ -92,6 +94,29 @@ export async function exportRanking(
     e.segmentLabel ?? '',
   ]);
 
+
+  let result: { buffer: Buffer | ArrayBuffer; contentType: string; filename: string };
+  if (format === 'csv') {
+    const lines = [header, ...rows].map((row) => row.map(csvEscape).join(','));
+    const buffer = Buffer.from('\uFEFF' + lines.join('\n'), 'utf8');
+    result = { buffer, contentType: 'text/csv; charset=utf-8', filename: ranking.examName + '-排名.csv' };
+  } else {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('成绩排名');
+    sheet.addRow(header);
+    rows.forEach((row) => sheet.addRow(row));
+    sheet.getRow(1).font = { bold: true };
+    sheet.columns.forEach((column, index) => {
+      column.width = index === 1 ? 16 : index === 2 || index === 3 ? 24 : 14;
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    result = {
+      buffer,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      filename: ranking.examName + '-排名.xlsx',
+    };
+  }
+
   await prisma.auditLog.create({
     data: {
       operatorId,
@@ -100,25 +125,5 @@ export async function exportRanking(
       remark: '导出' + (format === 'csv' ? 'CSV' : 'Excel') + '排名，共 ' + ranking.total + ' 人',
     },
   });
-
-  if (format === 'csv') {
-    const lines = [header, ...rows].map((row) => row.map(csvEscape).join(','));
-    const buffer = Buffer.from('\uFEFF' + lines.join('\n'), 'utf8');
-    return { buffer, contentType: 'text/csv; charset=utf-8', filename: ranking.examName + '-排名.csv' };
-  }
-
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('成绩排名');
-  sheet.addRow(header);
-  rows.forEach((row) => sheet.addRow(row));
-  sheet.getRow(1).font = { bold: true };
-  sheet.columns.forEach((column, index) => {
-    column.width = index === 1 ? 16 : index === 2 || index === 3 ? 24 : 14;
-  });
-  const buffer = await workbook.xlsx.writeBuffer();
-  return {
-    buffer,
-    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    filename: ranking.examName + '-排名.xlsx',
-  };
+  return result;
 }

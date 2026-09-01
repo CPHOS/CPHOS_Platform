@@ -75,6 +75,7 @@ function toImageDto(
 function toQuestionDto(
   question: PaperWithRelations['questions'][number],
   pages: Map<string, PaperWithRelations['pages'][number]>,
+  revealProcess: boolean,
 ): PaperQuestionDto {
   return {
     id: String(question.id),
@@ -82,9 +83,14 @@ function toQuestionDto(
     questionLabel: question.questionLabel,
     maxScore: num(question.maxScore),
     finalScore: question.finalScore === null ? null : num(question.finalScore),
-    roundScores: question.markingTasks.map((t) => (t.score === null ? null : Number(t.score))).filter((v): v is number => v !== null),
-    arbitrationStatus: question.arbitration?.status ?? null,
-    arbitrationScore: question.arbitration?.score === null || question.arbitration?.score === undefined ? null : Number(question.arbitration.score),
+    roundScores: revealProcess
+      ? question.markingTasks.map((t) => (t.score === null ? null : Number(t.score))).filter((v): v is number => v !== null)
+      : [],
+    arbitrationStatus: revealProcess ? question.arbitration?.status ?? null : null,
+    arbitrationScore:
+      revealProcess && question.arbitration?.score !== null && question.arbitration?.score !== undefined
+        ? Number(question.arbitration.score)
+        : null,
     images: question.images.map((image) => toImageDto(image, pages)),
     updatedAt: question.updatedAt.toISOString(),
   };
@@ -101,8 +107,9 @@ function toPageDto(page: PaperWithRelations['pages'][number]): PaperPageDto {
   };
 }
 
-function toPaperDto(paper: PaperWithRelations): PaperDto {
+function toPaperDto(paper: PaperWithRelations, includeInternal = false): PaperDto {
   const pages = new Map(paper.pages.map((p) => [String(p.id), p]));
+  const revealProcess = includeInternal || paper.finalizedAt !== null;
   return {
     id: String(paper.id),
     examId: String(paper.examId),
@@ -115,7 +122,7 @@ function toPaperDto(paper: PaperWithRelations): PaperDto {
     score: paper.score === null ? null : Number(paper.score),
     finalizedAt: paper.finalizedAt?.toISOString() ?? null,
     pages: paper.pages.map(toPageDto),
-    questions: paper.questions.map((q) => toQuestionDto(q, pages)),
+    questions: paper.questions.map((q) => toQuestionDto(q, pages, revealProcess)),
     createdAt: paper.createdAt.toISOString(),
     updatedAt: paper.updatedAt.toISOString(),
   };
@@ -185,7 +192,7 @@ export async function listMyPapers(
       include: PAPER_INCLUDE,
     }),
   ]);
-  return { items: rows.map(toPaperDto), total, page: query.page, pageSize: query.pageSize };
+  return { items: rows.map((paper) => toPaperDto(paper)), total, page: query.page, pageSize: query.pageSize };
 }
 
 export async function listAllPapers(query: ListPapersQuery): Promise<PaperListDto> {
@@ -212,7 +219,7 @@ export async function listAllPapers(query: ListPapersQuery): Promise<PaperListDt
       include: PAPER_INCLUDE,
     }),
   ]);
-  return { items: rows.map(toPaperDto), total, page: query.page, pageSize: query.pageSize };
+  return { items: rows.map((paper) => toPaperDto(paper, true)), total, page: query.page, pageSize: query.pageSize };
 }
 
 export async function getMyPaper(userId: bigint, id: bigint): Promise<PaperDto> {
@@ -221,14 +228,24 @@ export async function getMyPaper(userId: bigint, id: bigint): Promise<PaperDto> 
 }
 
 export async function getPaperForAdmin(id: bigint): Promise<PaperDto> {
-  return toPaperDto(await findPaperOrThrow(id));
+  return toPaperDto(await findPaperOrThrow(id), true);
 }
 
 export async function createPaper(
   userId: bigint,
   input: CreatePaperInput,
 ): Promise<PaperDto> {
-  const profileId = await getProfileId(userId);
+  const profile = await prisma.memberProfile.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      uploadLimit: true,
+      teamId: true,
+      team: { select: { uploadLimit: true } },
+    },
+  });
+  if (!profile) throw Errors.forbidden();
+  const profileId = profile.id;
   const examId = BigInt(input.examId);
   const studentId = BigInt(input.studentId);
 
@@ -247,6 +264,16 @@ export async function createPaper(
 
   try {
     const paper = await prisma.$transaction(async (tx) => {
+      // 同考试上传串行化，防止并发绕过个人/团队共享限额
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
+      const quotaWhere = profile.teamId
+        ? { examId, uploadedBy: { teamId: profile.teamId } }
+        : { examId, uploadedById: profile.id };
+      const used = await tx.paper.count({ where: quotaWhere });
+      const limit = profile.team?.uploadLimit ?? profile.uploadLimit;
+      if (limit > 0 && used >= limit) {
+        throw Errors.validation('本场考试上传额度已用完');
+      }
       const created = await tx.paper.create({
         data: {
           examId,
@@ -278,6 +305,14 @@ export async function createPaper(
   }
 }
 
+function assertPaperEditable(paper: PaperWithRelations): void {
+  if (paper.status === 'ARCHIVED') throw Errors.validation('已归档整卷不可修改');
+  if (paper.finalizedAt) throw Errors.validation('成绩已定稿，整卷不可修改');
+  if (paper.questions.some((q) => q.markingTasks.length > 0)) {
+    throw Errors.validation('已进入分配/阅卷的整卷不可修改');
+  }
+}
+
 export async function addPaperPage(
   userId: bigint,
   paperId: bigint,
@@ -285,7 +320,8 @@ export async function addPaperPage(
 ): Promise<PaperDto> {
   const profileId = await getProfileId(userId);
   const paper = await findOwnPaperOrThrow(paperId, profileId);
-  if (paper.status === 'ARCHIVED') throw Errors.validation('已归档整卷不可修改');
+  assertPaperEditable(paper);
+  if (input.pageNo > env.PAPER_MAX_PAGES) throw Errors.validation('超过单卷页数上限');
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
@@ -317,7 +353,7 @@ export async function bindQuestionImage(
 ): Promise<PaperDto> {
   const profileId = await getProfileId(userId);
   const paper = await findOwnPaperOrThrow(paperId, profileId);
-  if (paper.status === 'ARCHIVED') throw Errors.validation('已归档整卷不可修改');
+  assertPaperEditable(paper);
 
   const questionId = BigInt(input.paperQuestionId);
   const pageId = BigInt(input.paperPageId);
@@ -359,18 +395,21 @@ export async function removeQuestionImage(
 ): Promise<PaperDto> {
   const profileId = await getProfileId(userId);
   const paper = await findOwnPaperOrThrow(paperId, profileId);
-  if (paper.status === 'ARCHIVED') throw Errors.validation('已归档整卷不可修改');
+  assertPaperEditable(paper);
 
   const questionId = BigInt(input.paperQuestionId);
   const pageId = BigInt(input.paperPageId);
+  if (!paper.questions.some((q) => q.id === questionId)) throw Errors.notFound('题目');
+  if (!paper.pages.some((p) => p.id === pageId)) throw Errors.notFound('答题卡页');
   await prisma.$transaction(async (tx) => {
-    await tx.questionImage.deleteMany({
+    const removed = await tx.questionImage.deleteMany({
       where: {
         paperQuestionId: questionId,
         paperPageId: pageId,
         partIndex: input.partIndex,
       },
     });
+    if (removed.count === 0) throw Errors.notFound('图片绑定');
     await writeAudit(tx, userId, 'PAPER_QUESTION_BIND', paper, '移除题目槽位 ' + questionId + ' 的图片绑定');
   });
   const updated = await findOwnPaperOrThrow(paperId, profileId);
@@ -384,6 +423,12 @@ export async function setPaperStatus(
 ): Promise<PaperDto> {
   const profileId = await getProfileId(userId);
   const paper = await findOwnPaperOrThrow(paperId, profileId);
+  if (paper.status === 'ARCHIVED' && input.status !== 'ARCHIVED') {
+    throw Errors.validation('已归档整卷不可恢复');
+  }
+  if (paper.finalizedAt && input.status !== 'ARCHIVED') {
+    throw Errors.validation('成绩已定稿，仅可随考试归档');
+  }
 
   if (input.status === 'READY') {
     const missing = paper.questions.filter((q) => q.images.length === 0);
@@ -439,7 +484,7 @@ export async function listMyFinalizedPapers(
       include: PAPER_INCLUDE,
     }),
   ]);
-  return { items: rows.map(toPaperDto), total, page: query.page, pageSize: query.pageSize };
+  return { items: rows.map((paper) => toPaperDto(paper)), total, page: query.page, pageSize: query.pageSize };
 }
 
 export async function getMyRanking(
@@ -494,13 +539,24 @@ export interface UploadPaperPageInput {
   sizeBytes: number;
 }
 
-function safeExt(originalName: string, mimeType: string): string {
-  const ext = path.extname(originalName).toLowerCase();
-  if (ext && ext.length <= 8) return ext;
-  if (mimeType.includes('png')) return '.png';
-  if (mimeType.includes('webp')) return '.webp';
-  if (mimeType.includes('pdf')) return '.pdf';
-  return '.jpg';
+const ALLOWED_UPLOAD_MIME: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+};
+
+function safeUploadExt(mimeType: string): string {
+  const ext = ALLOWED_UPLOAD_MIME[mimeType.toLowerCase()];
+  if (!ext) throw Errors.validation('仅支持 JPG/PNG/WebP 答题卡图片');
+  return ext;
+}
+
+function assertInsideUploadDir(absolutePath: string): void {
+  const uploadRoot = path.resolve(process.cwd(), env.UPLOAD_DIR);
+  const relative = path.relative(uploadRoot, absolutePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw Errors.validation('文件路径非法');
+  }
 }
 
 export async function uploadPaperPage(
@@ -510,11 +566,16 @@ export async function uploadPaperPage(
 ): Promise<PaperDto> {
   const profileId = await getProfileId(userId);
   const paper = await findOwnPaperOrThrow(paperId, profileId);
-  if (paper.status === 'ARCHIVED') throw Errors.validation('已归档整卷不可修改');
+  assertPaperEditable(paper);
+  if (paper.pages.length >= env.PAPER_MAX_PAGES) throw Errors.validation('超过单卷页数上限');
+  if (!ALLOWED_UPLOAD_MIME[input.mimeType.toLowerCase()]) {
+    throw Errors.validation('仅支持 JPG/PNG/WebP 答题卡图片');
+  }
 
   const fileKey =
-    'papers/' + String(paperId) + '/' + randomUUID() + safeExt(input.originalName, input.mimeType);
+    'papers/' + String(paperId) + '/' + randomUUID() + safeUploadExt(input.mimeType);
   const absolute = path.resolve(process.cwd(), env.UPLOAD_DIR, fileKey);
+  assertInsideUploadDir(absolute);
   await fs.mkdir(path.dirname(absolute), { recursive: true });
   await fs.writeFile(absolute, input.buffer);
 
@@ -558,6 +619,10 @@ export async function getPaperPageStream(
   });
   if (!page) throw Errors.notFound('答题卡页');
   const absolutePath = path.resolve(process.cwd(), env.UPLOAD_DIR, page.fileKey);
+  assertInsideUploadDir(absolutePath);
   if (!existsSync(absolutePath)) throw Errors.notFound('文件');
-  return { stream: createReadStream(absolutePath), mimeType: page.mimeType ?? 'application/octet-stream' };
+  const mime = Object.keys(ALLOWED_UPLOAD_MIME).includes((page.mimeType ?? '').toLowerCase())
+    ? page.mimeType!
+    : 'application/octet-stream';
+  return { stream: createReadStream(absolutePath), mimeType: mime };
 }

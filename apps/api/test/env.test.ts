@@ -55,14 +55,27 @@ describe('生产环境密钥 fail-fast', () => {
     await expect(loadEnv()).rejects.toThrow(/SMTP_HOST/);
   });
 
-  it('生产环境提供独立强随机值与 SMTP 时正常解析', async () => {
+  it('生产环境提供独立密钥、正式 DB/CORS/SMTP 时正常解析', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('JWT_SECRET', 'j'.repeat(64));
     vi.stubEnv('CODE_SALT', 's'.repeat(32));
+    vi.stubEnv('DATABASE_URL', 'postgresql://cphos:secret@db.example.com:5432/cphos');
+    vi.stubEnv('CORS_ORIGIN', 'https://exam.example.com');
     vi.stubEnv('SMTP_HOST', 'smtp.example.com');
     vi.stubEnv('SMTP_FROM', 'CPHOS <no-reply@example.com>');
     const { env } = await loadEnv();
     expect(env.JWT_SECRET).toBe('j'.repeat(64));
     expect(env.SMTP_SECURE).toBe(false);
+  });
+
+  it('生产环境拒绝开发默认数据库与 localhost CORS', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('JWT_SECRET', 'j'.repeat(64));
+    vi.stubEnv('CODE_SALT', 's'.repeat(32));
+    vi.stubEnv('DATABASE_URL', 'postgresql://cphos:cphos@127.0.0.1:54329/cphos');
+    vi.stubEnv('CORS_ORIGIN', 'http://localhost:5173');
+    vi.stubEnv('SMTP_HOST', 'smtp.example.com');
+    vi.stubEnv('SMTP_FROM', 'CPHOS <no-reply@example.com>');
+    await expect(loadEnv()).rejects.toThrow(/DATABASE_URL|CORS_ORIGIN/);
   });
 });

@@ -29,17 +29,27 @@ import { studentApi } from '../../api/students';
 
 function GuidedImage({ paperId, page }: { paperId: string; page: PaperPageDto }) {
   const [url, setUrl] = useState('');
+  const [error, setError] = useState(false);
   const [rows, setRows] = useState(2);
   const [cols, setCols] = useState(1);
   useEffect(() => {
     let alive = true;
-    void paperApi.pageImage(paperId, page.id).then((blob) => {
-      if (!alive) return;
-      setUrl(URL.createObjectURL(blob));
-    });
+    let objectUrl = '';
+    setUrl('');
+    setError(false);
+    void paperApi
+      .pageImage(paperId, page.id)
+      .then((blob) => {
+        if (!alive) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {
+        if (alive) setError(true);
+      });
     return () => {
       alive = false;
-      if (url) URL.revokeObjectURL(url);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [paperId, page.id]);
   return (
@@ -48,8 +58,8 @@ function GuidedImage({ paperId, page }: { paperId: string; page: PaperPageDto })
         {url ? (
           <img src={url} alt={'第' + page.pageNo + '页'} style={{ width: '100%', display: 'block' }} />
         ) : (
-          <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            加载中
+          <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: error ? '#c00' : undefined }}>
+            {error ? '图片加载失败' : '加载中'}
           </div>
         )}
         {Array.from({ length: rows - 1 }).map((_, index) => (
@@ -308,7 +318,7 @@ export function PapersPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*,application/pdf"
+                accept="image/jpeg,image/png,image/webp"
                 style={{ display: 'none' }}
                 data-testid="paper-page-file"
                 onChange={(e) => void uploadPage(e.target.files?.[0])}

@@ -27,10 +27,10 @@ pnpm dev:api
 # 终端 4：前端（http://localhost:5173，/api 已代理到后端）
 pnpm dev:web
 
-# 创建系统管理员与内部账号
-pnpm api:init-super-admin -- super <密码> <显示名>                  # 超级管理员（受保护，不可删除）
-pnpm api:create-internal -- <用户名> <密码> <姓名> CPHOS_MEMBER       # CPHOS 内部员工（建档即用，无需邮箱验证）
-pnpm api:create-internal -- <用户名> <密码> <姓名> ADMIN              # 管理员（也可由超管提升）
+# 创建系统管理员与内部账号（注意参数顺序：用户名 显示名 密码 [角色]）
+pnpm api:init-super-admin -- super "超级管理员" "<强密码>"                    # 超级管理员（受保护，不可删除）
+pnpm api:create-internal -- member01 "张三" "<强密码>" CPHOS_MEMBER           # CPHOS 内部员工
+pnpm api:create-internal -- admin01 "李四" "<强密码>" ADMIN                   # 管理员（也可由超管提升）
 ```
 
 开发模式未配置 SMTP 时，验证码邮件写入 `apps/api/.devmail/*.json` 并打印在 API 日志中。
@@ -58,4 +58,16 @@ pnpm --filter @cphos/api start   # node apps/api/dist/server.js
 - Nginx：`deploy/nginx.conf.example`
 - PM2：`deploy/ecosystem.config.cjs.example`
 
-生产必须显式配置：`NODE_ENV=production`、正式 `DATABASE_URL`、强随机 `JWT_SECRET`/`CODE_SALT`、`CORS_ORIGIN`、SMTP；上传目录生产建议替换为对象存储。
+生产发布前至少执行：
+
+```bash
+# 1) 备份数据库与上传目录
+pg_dump "$DATABASE_URL" -Fc -f backup-$(date +%F).dump
+# 2) 当前按既定决策使用 db push 同步 schema（无迁移历史）；执行前必须可回滚
+pnpm --filter @cphos/api exec prisma generate
+pnpm --filter @cphos/api exec prisma db push
+# 3) 启动并通过就绪探针
+curl -fsS http://127.0.0.1:3001/api/health/ready
+```
+
+生产必须显式配置：`NODE_ENV=production`、`HOST=127.0.0.1`、正式 `DATABASE_URL`、强随机 `JWT_SECRET`/`CODE_SALT`、`CORS_ORIGIN`、SMTP；上传目录建议使用单机持久盘或后续替换对象存储，并纳入备份。

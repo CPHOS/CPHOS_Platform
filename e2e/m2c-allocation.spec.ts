@@ -49,11 +49,11 @@ async function setupReadyPaper(request: any, suffix: string) {
 
   await request.post('/api/papers/' + paper.id + '/pages', {
     headers: coachAuth,
-    data: { pageNo: 1, fileKey: 'e2e/p1.png' },
+    data: { pageNo: 1, fileKey: 'papers/' + paper.id + '/p1.png' },
   });
   await request.post('/api/papers/' + paper.id + '/pages', {
     headers: coachAuth,
-    data: { pageNo: 2, fileKey: 'e2e/p2.png' },
+    data: { pageNo: 2, fileKey: 'papers/' + paper.id + '/p2.png' },
   });
   const refreshed = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());
   const q1 = refreshed.questions.find((q: any) => q.slot === 1);
