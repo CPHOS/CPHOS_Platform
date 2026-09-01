@@ -434,4 +434,3 @@ export const rankingExportQuerySchema = z.object({
   format: z.enum(['csv', 'xlsx']).default('xlsx'),
 });
 export type RankingExportQuery = z.infer<typeof rankingExportQuerySchema>;
-
