@@ -53,11 +53,28 @@ enum AuditAction {
   TEAM_CREATE // 创建团队
   TEAM_UPDATE // 更新团队
   TEAM_DELETE // 删除团队
+  EXAM_CREATE // 创建考试批次
+  EXAM_UPDATE // 更新考试
+  EXAM_CONFIG // 更新考试配置
+  EXAM_PUBLISH // 发布考试
+  EXAM_CLOSE // 结束考试
+  EXAM_ARCHIVE // 归档考试
+  STUDENT_CREATE // 新增学生
+  STUDENT_UPDATE // 更新学生
+  STUDENT_DELETE // 归档学生
 }
 
 enum MemberRole {
   LEADER // 负责人
   COACH // 附属教练（仲裁已改为功能模块，不再是身份）
+}
+
+// 考试状态机：草稿 -> 已发布 -> 已结束 -> 已归档
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
 }
 
 // ---------- 认证域 ----------
@@ -83,6 +100,7 @@ model UserAccount {
   applications  AuditApplication[]
   profile       MemberProfile?
   ledTeam       Team?              @relation("TeamLeader")
+  createdExams  Exam[]             @relation("ExamCreator")
 }
 
 model EmailCode {
@@ -160,11 +178,15 @@ model AuditLog {
   action         AuditAction
   legacyMemberId BigInt?
   targetUserId   BigInt? // 账号/团队管理类操作的目标对象
+  examId         BigInt? // 考试管理类操作的目标考试
+  studentId      BigInt? // 学生名册类操作的目标学生
   remark         String?
   createdAt      DateTime    @default(now())
 
   @@index([applicationId, createdAt])
   @@index([targetUserId, createdAt])
+  @@index([examId, createdAt])
+  @@index([studentId, createdAt])
   @@index([action, createdAt])
 }
 
@@ -186,6 +208,8 @@ model MemberProfile {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  students Student[]
+
   @@index([schoolId])
   @@index([teamId])
 }
@@ -200,6 +224,62 @@ model Team {
   updatedAt   DateTime    @updatedAt
 
   members MemberProfile[] @relation("TeamMembers")
+}
+
+// ---------- 考试域：M2-A 考试批次 / 考试配置 / 学生名册 ----------
+
+model Exam {
+  id          BigInt     @id @default(autoincrement())
+  name        String
+  description String?
+  status      ExamStatus @default(DRAFT)
+  createdById BigInt
+  createdBy   UserAccount @relation("ExamCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedAt DateTime?
+  closedAt    DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  config ExamConfig?
+
+  @@index([status, createdAt])
+}
+
+model ExamConfig {
+  id           BigInt   @id @default(autoincrement())
+  examId       BigInt   @unique
+  exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  // 不再区分理论/实验：一场考试只有槽位/题目对象数量
+  slotCount    Int      @default(8)
+  defaultPoint Decimal  @default(0) @db.Decimal(8, 2)
+  gap          Decimal  @default(0) @db.Decimal(8, 2)
+  // 槽位/页面标题/题号/每题分值映射；理论/实验可通过两场考试分别发布
+  titleMapping Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Student {
+  id         BigInt    @id @default(autoincrement())
+  ownerId    BigInt
+  owner      MemberProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name       String
+  schoolId   BigInt?
+  school     School?   @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  gradeId    BigInt?
+  grade      Grade?    @relation(fields: [gradeId], references: [id], onDelete: SetNull)
+  prizeId    BigInt?
+  prize      Prize?    @relation(fields: [prizeId], references: [id], onDelete: SetNull)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([ownerId, archivedAt])
+  @@index([name])
+  @@index([schoolId])
+  @@index([gradeId])
+  @@index([prizeId])
 }
 
 // ---------- 主数据字典（新系统自增 ID，管理员维护） ----------
@@ -217,19 +297,22 @@ model School {
   area         Area               @relation(fields: [areaId], references: [id])
   members      MemberProfile[]
   applications AuditApplication[]
+  students     Student[]
 
   @@unique([name, areaId])
   @@index([areaId])
 }
 
 model Grade {
-  id   BigInt @id @default(autoincrement())
-  name String @unique
+  id       BigInt    @id @default(autoincrement())
+  name     String    @unique
+  students Student[]
 }
 
 model Prize {
-  id   BigInt @id @default(autoincrement())
-  name String @unique
+  id       BigInt    @id @default(autoincrement())
+  name     String    @unique
+  students Student[]
 }
 
 model Topic {

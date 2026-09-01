@@ -17,11 +17,13 @@ test('后台关键页面 UI 截图', async ({ page }) => {
   await login(page, ACCOUNTS.admin.account, ACCOUNTS.admin.password);
 
   await page.goto('/admin');
-  await expect(page.getByText('审核工作台')).toBeVisible();
+  await expect(page.locator('.shell-inner')).toContainText('概览');
   await shot(page, 'admin-home.png');
 
   for (const item of [
     { path: '/admin/teams', name: 'admin-teams.png' },
+    { path: '/admin/exams', name: 'admin-exams.png' },
+    { path: '/admin/students', name: 'admin-students.png' },
     { path: '/admin/logs', name: 'admin-logs.png' },
     { path: '/admin/dict', name: 'admin-dict.png' },
     { path: '/admin/members', name: 'admin-members.png' },
@@ -35,6 +37,10 @@ test('后台关键页面 UI 截图', async ({ page }) => {
 
 test('平台用户安全设置 UI 截图', async ({ page }) => {
   await login(page, ACCOUNTS.coach2.account, ACCOUNTS.coach2.password);
+  await page.goto('/app/students');
+  await expect(page.locator('.shell-inner')).toContainText('学生名册');
+  await shot(page, 'platform-students.png');
+
   await page.goto('/app/profile');
   await expect(page.getByText('安全设置')).toBeVisible();
   await shot(page, 'platform-profile.png');

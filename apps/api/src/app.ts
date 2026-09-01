@@ -16,6 +16,9 @@ import { adminMemberRoutes } from './modules/members/members.admin.routes.js';
 import { adminAccountRoutes } from './modules/members/accounts.admin.routes.js';
 import { adminTeamRoutes } from './modules/teams/teams.admin.routes.js';
 import { adminDictRoutes } from './modules/dict/dict.admin.routes.js';
+import { adminExamRoutes } from './modules/exams/exams.admin.routes.js';
+import { studentRoutes } from './modules/students/students.routes.js';
+import { adminStudentRoutes } from './modules/students/students.admin.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -58,6 +61,9 @@ export async function buildApp() {
   await app.register(adminAccountRoutes, { prefix: '/api/admin' });
   await app.register(adminTeamRoutes, { prefix: '/api/admin' });
   await app.register(adminDictRoutes, { prefix: '/api/admin' });
+  await app.register(adminExamRoutes, { prefix: '/api/admin' });
+  await app.register(studentRoutes, { prefix: '/api' });
+  await app.register(adminStudentRoutes, { prefix: '/api/admin' });
 
   return app;
 }

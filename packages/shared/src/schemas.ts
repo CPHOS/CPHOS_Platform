@@ -4,6 +4,7 @@ import {
   AUDIT_ACTIONS,
   AUDIT_STATUSES,
   EMAIL_CODE_PURPOSES,
+  EXAM_STATUSES,
   MEMBER_ROLES,
   USER_STATUSES,
 } from './enums.js';
@@ -238,3 +239,79 @@ export const updateSchoolSchema = z
   })
   .refine((v) => v.name !== undefined || v.areaId !== undefined, { message: '没有需要更新的内容' });
 export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>;
+
+// ---------- 考试域：M2-A ----------
+
+export const createExamSchema = z.object({
+  name: z.string().trim().min(1, '请输入考试名称').max(100, '考试名称过长'),
+  description: z.string().trim().max(500, '描述过长').optional(),
+});
+export type CreateExamInput = z.infer<typeof createExamSchema>;
+
+export const updateExamSchema = z
+  .object({
+    name: z.string().trim().min(1, '请输入考试名称').max(100, '考试名称过长').optional(),
+    description: z.string().trim().max(500, '描述过长').nullable().optional(),
+  })
+  .refine((v) => v.name !== undefined || v.description !== undefined, {
+    message: '没有需要更新的内容',
+  });
+export type UpdateExamInput = z.infer<typeof updateExamSchema>;
+
+export const examTitleSchema = z.object({
+  slot: z.number().int().min(1, '槽位不合法').max(30),
+  title: z.string().trim().min(1, '请输入页面标题').max(100, '标题过长'),
+  questionLabel: z.string().trim().max(100, '题号标签过长').optional(),
+  point: z.number().min(0).max(10000).optional(),
+});
+
+export const upsertExamConfigSchema = z.object({
+  slotCount: z.number().int().min(1).max(30),
+  defaultPoint: z.number().min(0).max(10000),
+  gap: z.number().min(0).max(10000),
+  titleMapping: z.array(examTitleSchema).max(40).optional(),
+});
+export type UpsertExamConfigInput = z.infer<typeof upsertExamConfigSchema>;
+
+export const listExamsQuerySchema = z.object({
+  status: z.enum(EXAM_STATUSES).optional(),
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListExamsQuery = z.infer<typeof listExamsQuerySchema>;
+
+export const createStudentSchema = z.object({
+  name: z.string().trim().min(1, '请输入学生姓名').max(50, '姓名过长'),
+  schoolId: idSchema.optional(),
+  gradeId: idSchema.optional(),
+  prizeId: idSchema.optional(),
+});
+export type CreateStudentInput = z.infer<typeof createStudentSchema>;
+
+export const updateStudentSchema = z
+  .object({
+    name: z.string().trim().min(1, '请输入学生姓名').max(50, '姓名过长').optional(),
+    schoolId: idSchema.nullable().optional(),
+    gradeId: idSchema.nullable().optional(),
+    prizeId: idSchema.nullable().optional(),
+  })
+  .refine(
+    (v) =>
+      v.name !== undefined ||
+      v.schoolId !== undefined ||
+      v.gradeId !== undefined ||
+      v.prizeId !== undefined,
+    { message: '没有需要更新的内容' },
+  );
+export type UpdateStudentInput = z.infer<typeof updateStudentSchema>;
+
+export const listStudentsQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  schoolId: idSchema.optional(),
+  gradeId: idSchema.optional(),
+  prizeId: idSchema.optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListStudentsQuery = z.infer<typeof listStudentsQuerySchema>;
