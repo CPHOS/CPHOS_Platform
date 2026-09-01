@@ -26,6 +26,7 @@ import { adminPaperRoutes } from './modules/papers/papers.admin.routes.js';
 import { adminAllocationRoutes } from './modules/allocation/allocation.admin.routes.js';
 import { taskRoutes } from './modules/allocation/tasks.routes.js';
 import { markingRoutes } from './modules/marking/marking.routes.js';
+import { adminRankingRoutes } from './modules/ranking/ranking.admin.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -80,6 +81,7 @@ export async function buildApp() {
   await app.register(adminAllocationRoutes, { prefix: '/api/admin' });
   await app.register(taskRoutes, { prefix: '/api' });
   await app.register(markingRoutes, { prefix: '/api' });
+  await app.register(adminRankingRoutes, { prefix: '/api/admin' });
 
   return app;
 }

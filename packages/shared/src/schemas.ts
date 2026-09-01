@@ -425,3 +425,13 @@ export const listArbitrationsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListArbitrationsQuery = z.infer<typeof listArbitrationsQuerySchema>;
+export const rankingQuerySchema = z.object({
+  segments: z.string().trim().max(100).optional(),
+});
+export type RankingQuery = z.infer<typeof rankingQuerySchema>;
+
+export const rankingExportQuerySchema = z.object({
+  format: z.enum(['csv', 'xlsx']).default('xlsx'),
+});
+export type RankingExportQuery = z.infer<typeof rankingExportQuerySchema>;
+

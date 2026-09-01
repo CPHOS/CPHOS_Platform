@@ -26,6 +26,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { adminAllocationApi } from '../../../api/allocation';
 import { adminExamsApi } from '../../../api/exams';
+import { rankingApi } from '../../../api/ranking';
 import { apiErrorMessage } from '../../../api/http';
 
 interface ExamForm {
@@ -64,6 +65,8 @@ export function ExamsAdminPage() {
   const [configSaving, setConfigSaving] = useState(false);
   const [allocating, setAllocating] = useState<ExamDto | null>(null);
   const [allocatingNow, setAllocatingNow] = useState(false);
+  const [rankingExam, setRankingExam] = useState<ExamDto | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'exams', status, q, page, pageSize],
@@ -78,6 +81,11 @@ export function ExamsAdminPage() {
     queryKey: ['admin', 'allocation', 'batches', allocating?.id],
     queryFn: () => adminAllocationApi.batches(allocating!.id),
     enabled: !!allocating,
+  });
+  const { data: ranking, refetch: refetchRanking } = useQuery({
+    queryKey: ['admin', 'ranking', rankingExam?.id],
+    queryFn: () => rankingApi.get(rankingExam!.id),
+    enabled: !!rankingExam,
   });
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'exams'] });
@@ -178,6 +186,32 @@ export function ExamsAdminPage() {
     }
   };
 
+
+  const openRanking = (exam: ExamDto) => {
+    setRankingExam(exam);
+    refetchRanking();
+  };
+
+  const exportRanking = async (format: 'csv' | 'xlsx') => {
+    if (!rankingExam) return;
+    setExporting(true);
+    try {
+      const file = await rankingApi.export(rankingExam.id, format);
+      const url = URL.createObjectURL(file.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const doAction = async (exam: ExamDto, action: 'publish' | 'close' | 'archive' | 'remove') => {
     try {
       if (action === 'publish') await adminExamsApi.publish(exam.id);
@@ -222,6 +256,7 @@ export function ExamsAdminPage() {
           {r.status === 'DRAFT' && <a onClick={() => openEdit(r)}>编辑</a>}
           {r.status !== 'ARCHIVED' && <a onClick={() => openConfig(r)}>配置</a>}
           {r.status !== 'DRAFT' && r.status !== 'ARCHIVED' && <a onClick={() => setAllocating(r)}>分配</a>}
+          <a onClick={() => openRanking(r)}>排名</a>
           {r.status === 'DRAFT' && (
             <Popconfirm title="发布后教练即可报名，确认发布？" onConfirm={() => void doAction(r, 'publish')}>
               <a>发布</a>
@@ -449,6 +484,50 @@ export function ExamsAdminPage() {
             ]}
           />
         </Card>
+      </Drawer>
+
+      <Drawer
+        title={'成绩排名：' + (rankingExam?.name ?? '')}
+        open={!!rankingExam}
+        onClose={() => setRankingExam(null)}
+        width={680}
+        extra={
+          <Space>
+            <Button loading={exporting} onClick={() => void exportRanking('csv')}>
+              导出 CSV
+            </Button>
+            <Button type="primary" loading={exporting} onClick={() => void exportRanking('xlsx')}>
+              导出 Excel
+            </Button>
+          </Space>
+        }
+      >
+        {ranking && (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <span>
+              已定稿 {ranking.total} 人 · 分段位置：{ranking.segmentPositions.join(' / ')}
+            </span>
+            <Table
+              rowKey="paperId"
+              size="small"
+              pagination={false}
+              dataSource={ranking.entries}
+              columns={[
+                { title: '排名', dataIndex: 'rank', width: 70 },
+                {
+                  title: '分段',
+                  dataIndex: 'segmentLabel',
+                  width: 80,
+                  render: (v: string | null) => (v ? <Tag color="gold">{v}</Tag> : '-'),
+                },
+                { title: '姓名', dataIndex: 'studentName', ellipsis: true },
+                { title: '学校', dataIndex: 'schoolName', render: (v: string | null) => v ?? '-', ellipsis: true },
+                { title: '教练', dataIndex: 'ownerName', render: (v: string | null) => v ?? '-', ellipsis: true },
+                { title: '总分', dataIndex: 'score', width: 90 },
+              ]}
+            />
+          </Space>
+        )}
       </Drawer>
 
     </Card>

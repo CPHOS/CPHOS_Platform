@@ -76,6 +76,7 @@ enum AuditAction {
   ARBITRATION_CREATE // 创建仲裁任务
   ARBITRATION_CLAIM // 认领仲裁任务
   ARBITRATION_GRADE // 仲裁打分
+  RANKING_EXPORT // 导出成绩排名
 }
 
 enum MemberRole {

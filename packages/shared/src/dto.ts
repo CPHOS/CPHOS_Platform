@@ -464,3 +464,25 @@ export interface BotCreatedDto {
   account: AccountDto;
   token: string;
 }
+
+// ---------- 考试域：M3 排名 / 导出 ----------
+
+export interface RankingEntryDto {
+  rank: number;
+  paperId: string;
+  studentId: string;
+  studentName: string;
+  schoolName: string | null;
+  ownerName: string | null;
+  score: number;
+  finalizedAt: string | null;
+  segmentLabel: string | null;
+}
+
+export interface RankingDto {
+  examId: string;
+  examName: string;
+  total: number;
+  segmentPositions: number[];
+  entries: RankingEntryDto[];
+}

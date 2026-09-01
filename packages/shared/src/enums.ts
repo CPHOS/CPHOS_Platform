@@ -137,6 +137,7 @@ export const AUDIT_ACTIONS = [
   'ARBITRATION_CREATE',
   'ARBITRATION_CLAIM',
   'ARBITRATION_GRADE',
+  'RANKING_EXPORT',
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
 
@@ -175,6 +176,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
   ARBITRATION_CREATE: '创建仲裁任务',
   ARBITRATION_CLAIM: '认领仲裁任务',
   ARBITRATION_GRADE: '仲裁打分',
+  RANKING_EXPORT: '导出成绩排名',
 };
 
 /** 字典类型（后台维护页签） */
