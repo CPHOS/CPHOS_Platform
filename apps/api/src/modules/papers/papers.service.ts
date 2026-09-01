@@ -3,6 +3,8 @@ import type {
   BindQuestionImageInput,
   CreatePaperInput,
   ListPapersQuery,
+  MyRankingEntryDto,
+  MyRankingListDto,
   PaperDto,
   PaperListDto,
   PaperPageDto,
@@ -33,7 +35,11 @@ const PAPER_INCLUDE = {
   pages: { orderBy: { pageNo: 'asc' as const } },
   questions: {
     orderBy: { slot: 'asc' as const },
-    include: { images: { orderBy: { partIndex: 'asc' as const } } },
+    include: {
+      images: { orderBy: { partIndex: 'asc' as const } },
+      markingTasks: { orderBy: { roundNo: 'asc' as const }, select: { roundNo: true, status: true, score: true } },
+      arbitration: { select: { status: true, score: true } },
+    },
   },
 } as const;
 
@@ -76,6 +82,9 @@ function toQuestionDto(
     questionLabel: question.questionLabel,
     maxScore: num(question.maxScore),
     finalScore: question.finalScore === null ? null : num(question.finalScore),
+    roundScores: question.markingTasks.map((t) => (t.score === null ? null : Number(t.score))).filter((v): v is number => v !== null),
+    arbitrationStatus: question.arbitration?.status ?? null,
+    arbitrationScore: question.arbitration?.score === null || question.arbitration?.score === undefined ? null : Number(question.arbitration.score),
     images: question.images.map((image) => toImageDto(image, pages)),
     updatedAt: question.updatedAt.toISOString(),
   };
@@ -400,6 +409,83 @@ export async function setPaperStatus(
   });
   return toPaperDto(updated);
 }
+
+export async function listMyFinalizedPapers(
+  userId: bigint,
+  query: ListPapersQuery,
+): Promise<PaperListDto> {
+  const profileId = await getProfileId(userId);
+  const where: Prisma.PaperWhereInput = {
+    uploadedById: profileId,
+    finalizedAt: { not: null },
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.examId ? { examId: BigInt(query.examId) } : {}),
+    ...(query.q
+      ? {
+          OR: [
+            { exam: { name: { contains: query.q } } },
+            { student: { name: { contains: query.q } } },
+          ],
+        }
+      : {}),
+  };
+  const [total, rows] = await Promise.all([
+    prisma.paper.count({ where }),
+    prisma.paper.findMany({
+      where,
+      orderBy: { finalizedAt: 'desc' },
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+      include: PAPER_INCLUDE,
+    }),
+  ]);
+  return { items: rows.map(toPaperDto), total, page: query.page, pageSize: query.pageSize };
+}
+
+export async function getMyRanking(
+  userId: bigint,
+  examId?: bigint,
+): Promise<MyRankingListDto> {
+  const profileId = await getProfileId(userId);
+  const ownPapers = await prisma.paper.findMany({
+    where: {
+      uploadedById: profileId,
+      finalizedAt: { not: null },
+      ...(examId ? { examId } : {}),
+    },
+    select: { examId: true },
+  });
+  const examIds = [...new Set(ownPapers.map((p) => p.examId))];
+  const items: MyRankingEntryDto[] = [];
+
+  for (const id of examIds) {
+    const papers = await prisma.paper.findMany({
+      where: { examId: id, finalizedAt: { not: null }, score: { not: null } },
+      orderBy: [{ score: 'desc' }, { finalizedAt: 'asc' }, { id: 'asc' }],
+      include: {
+        exam: { select: { name: true } },
+        student: { select: { name: true } },
+      },
+    });
+    const total = papers.length;
+    papers.forEach((paper, index) => {
+      if (paper.uploadedById === profileId) {
+        items.push({
+          rank: index + 1,
+          total,
+          paperId: String(paper.id),
+          examId: String(paper.examId),
+          examName: paper.exam.name,
+          studentName: paper.student.name,
+          score: paper.score === null ? 0 : Number(paper.score),
+          finalizedAt: paper.finalizedAt?.toISOString() ?? null,
+        });
+      }
+    });
+  }
+  return { items };
+}
+
 export interface UploadPaperPageInput {
   pageNo: number;
   buffer: Buffer;

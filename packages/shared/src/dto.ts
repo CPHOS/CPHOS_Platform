@@ -329,6 +329,9 @@ export interface PaperQuestionDto {
   questionLabel: string | null;
   maxScore: number;
   finalScore: number | null;
+  roundScores: number[];
+  arbitrationStatus: string | null;
+  arbitrationScore: number | null;
   images: QuestionImageDto[];
   updatedAt: string;
 }
@@ -485,4 +488,20 @@ export interface RankingDto {
   total: number;
   segmentPositions: number[];
   entries: RankingEntryDto[];
+}
+
+/** 平台用户视角：本人学生在各考试的排名 */
+export interface MyRankingEntryDto {
+  rank: number;
+  total: number;
+  paperId: string;
+  examId: string;
+  examName: string;
+  studentName: string;
+  score: number;
+  finalizedAt: string | null;
+}
+
+export interface MyRankingListDto {
+  items: MyRankingEntryDto[];
 }
