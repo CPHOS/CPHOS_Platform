@@ -24,6 +24,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
+import { adminAllocationApi } from '../../../api/allocation';
 import { adminExamsApi } from '../../../api/exams';
 import { apiErrorMessage } from '../../../api/http';
 
@@ -61,10 +62,22 @@ export function ExamsAdminPage() {
   const [saving, setSaving] = useState(false);
   const [configuring, setConfiguring] = useState<ExamDto | null>(null);
   const [configSaving, setConfigSaving] = useState(false);
+  const [allocating, setAllocating] = useState<ExamDto | null>(null);
+  const [allocatingNow, setAllocatingNow] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'exams', status, q, page, pageSize],
     queryFn: () => adminExamsApi.list({ status, q: q || undefined, page, pageSize }),
+  });
+  const { data: allocPreview, refetch: refetchPreview } = useQuery({
+    queryKey: ['admin', 'allocation', 'preview', allocating?.id],
+    queryFn: () => adminAllocationApi.preview(allocating!.id),
+    enabled: !!allocating,
+  });
+  const { data: allocBatches, refetch: refetchBatches } = useQuery({
+    queryKey: ['admin', 'allocation', 'batches', allocating?.id],
+    queryFn: () => adminAllocationApi.batches(allocating!.id),
+    enabled: !!allocating,
   });
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'exams'] });
@@ -138,6 +151,33 @@ export function ExamsAdminPage() {
     }
   };
 
+  const runAllocation = async () => {
+    if (!allocating) return;
+    setAllocatingNow(true);
+    try {
+      await adminAllocationApi.allocate(allocating.id, {});
+      message.success('分配批次已创建');
+      refetchPreview();
+      refetchBatches();
+      refresh();
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    } finally {
+      setAllocatingNow(false);
+    }
+  };
+
+  const revokeAllocation = async (batchId: string) => {
+    try {
+      await adminAllocationApi.revoke(batchId);
+      message.success('分配批次已撤销');
+      refetchPreview();
+      refetchBatches();
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    }
+  };
+
   const doAction = async (exam: ExamDto, action: 'publish' | 'close' | 'archive' | 'remove') => {
     try {
       if (action === 'publish') await adminExamsApi.publish(exam.id);
@@ -181,6 +221,7 @@ export function ExamsAdminPage() {
         <Space size="small" wrap>
           {r.status === 'DRAFT' && <a onClick={() => openEdit(r)}>编辑</a>}
           {r.status !== 'ARCHIVED' && <a onClick={() => openConfig(r)}>配置</a>}
+          {r.status !== 'DRAFT' && r.status !== 'ARCHIVED' && <a onClick={() => setAllocating(r)}>分配</a>}
           {r.status === 'DRAFT' && (
             <Popconfirm title="发布后教练即可报名，确认发布？" onConfirm={() => void doAction(r, 'publish')}>
               <a>发布</a>
@@ -334,6 +375,82 @@ export function ExamsAdminPage() {
           </Form.List>
         </Form>
       </Drawer>
+
+      <Drawer
+        title={'考试分配：' + (allocating?.name ?? '')}
+        open={!!allocating}
+        onClose={() => setAllocating(null)}
+        width={680}
+        extra={
+          <Button
+            type="primary"
+            loading={allocatingNow}
+            disabled={!allocPreview || allocPreview.questionCount === 0 || allocPreview.unassignedSlots.length > 0}
+            onClick={() => void runAllocation()}
+          >
+            生成均衡分配
+          </Button>
+        }
+      >
+        {allocPreview && (
+          <Card size="small" title="均衡预览" style={{ marginBottom: 16 }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <span>
+                就绪整卷 {allocPreview.readyPaperCount} 套 · 题目 {allocPreview.questionCount} 道 · 双阅任务 {allocPreview.taskCount} 个
+              </span>
+              {allocPreview.unassignedSlots.length > 0 && (
+                <span style={{ color: '#cf222e' }}>
+                  以下槽位没有可用阅卷成员：{allocPreview.unassignedSlots.join('、')}
+                </span>
+              )}
+              <Table
+                rowKey="slot"
+                size="small"
+                pagination={false}
+                dataSource={allocPreview.slots}
+                columns={[
+                  { title: '槽位', dataIndex: 'slot' },
+                  { title: '题数', dataIndex: 'questionCount' },
+                  { title: '双阅任务', dataIndex: 'taskCount' },
+                  { title: '阅卷人数', dataIndex: 'examinerCount' },
+                  { title: '最少/人', dataIndex: 'minTasks' },
+                  { title: '最多/人', dataIndex: 'maxTasks' },
+                ]}
+              />
+            </Space>
+          </Card>
+        )}
+
+        <Card size="small" title="历史分配批次">
+          <Table
+            rowKey="id"
+            size="small"
+            pagination={false}
+            dataSource={allocBatches?.items ?? []}
+            columns={[
+              {
+                title: '状态',
+                dataIndex: 'status',
+                render: (v: string) => <Tag color={v === 'ACTIVE' ? 'green' : 'default'}>{v === 'ACTIVE' ? '生效中' : '已撤销'}</Tag>,
+              },
+              { title: '任务数', dataIndex: 'totalTasks' },
+              { title: '创建时间', dataIndex: 'createdAt', render: (v: string) => new Date(v).toLocaleString() },
+              {
+                title: '操作',
+                render: (_, r: { id: string; status: string }) =>
+                  r.status === 'ACTIVE' ? (
+                    <Popconfirm title="撤销后未完成任务将取消，确认？" onConfirm={() => void revokeAllocation(r.id)}>
+                      <a style={{ color: '#cf222e' }}>撤销</a>
+                    </Popconfirm>
+                  ) : (
+                    '-'
+                  ),
+              },
+            ]}
+          />
+        </Card>
+      </Drawer>
+
     </Card>
   );
 }

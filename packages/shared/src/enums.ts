@@ -64,6 +64,23 @@ export const PAPER_STATUS_LABELS: Record<PaperStatus, string> = {
   ARCHIVED: '已归档',
 };
 
+/** 分配批次状态 */
+export const ALLOCATION_STATUSES = ['ACTIVE', 'REVOKED'] as const;
+export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
+export const ALLOCATION_STATUS_LABELS: Record<AllocationStatus, string> = {
+  ACTIVE: '生效中',
+  REVOKED: '已撤销',
+};
+
+/** 双阅任务状态 */
+export const MARKING_TASK_STATUSES = ['PENDING', 'COMPLETED', 'CANCELED'] as const;
+export type MarkingTaskStatus = (typeof MARKING_TASK_STATUSES)[number];
+export const MARKING_TASK_STATUS_LABELS: Record<MarkingTaskStatus, string> = {
+  PENDING: '待批阅',
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+};
+
 export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   PENDING: '待审核',
   ACTIVE: '正常',
@@ -101,6 +118,8 @@ export const AUDIT_ACTIONS = [
   'PAPER_QUESTION_BIND',
   'PAPER_READY',
   'PAPER_ARCHIVE',
+  'ALLOCATION_CREATE',
+  'ALLOCATION_REVOKE',
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
 
@@ -131,6 +150,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
   PAPER_QUESTION_BIND: '绑定题目图片',
   PAPER_READY: '整卷标记完成',
   PAPER_ARCHIVE: '归档整卷',
+  ALLOCATION_CREATE: '创建分配批次',
+  ALLOCATION_REVOKE: '撤销分配批次',
 };
 
 /** 字典类型（后台维护页签） */

@@ -21,6 +21,7 @@ import { PlatformHome } from './pages/platform/Home';
 import { ProfilePage } from './pages/Profile';
 import { StudentsPage } from './pages/platform/Students';
 import { PapersPage } from './pages/platform/Papers';
+import { TasksPage } from './pages/platform/Tasks';
 
 /**
  * 三端路由：
@@ -55,6 +56,7 @@ export function App() {
                 { key: '/app', label: '工作台', icon: <HomeOutlined /> },
                 { key: '/app/students', label: '学生名册', icon: <SolutionOutlined /> },
                 { key: '/app/papers', label: '整卷上传', icon: <CloudUploadOutlined /> },
+                { key: '/app/tasks', label: '阅卷任务', icon: <AuditOutlined /> },
                 { key: '/app/profile', label: '个人信息', icon: <IdcardOutlined /> },
               ]}
             />
@@ -64,6 +66,7 @@ export function App() {
         <Route index element={<PlatformHome />} />
         <Route path="students" element={<StudentsPage />} />
         <Route path="papers" element={<PapersPage />} />
+        <Route path="tasks" element={<TasksPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

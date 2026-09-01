@@ -5,6 +5,7 @@ import {
   AUDIT_STATUSES,
   EMAIL_CODE_PURPOSES,
   EXAM_STATUSES,
+  MARKING_TASK_STATUSES,
   MEMBER_ROLES,
   PAPER_STATUSES,
   USER_STATUSES,
@@ -369,3 +370,24 @@ export const listPapersQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListPapersQuery = z.infer<typeof listPapersQuerySchema>;
+
+// ---------- 考试域：M2-C 分配与双阅任务 ----------
+
+export const createAllocationSchema = z.object({
+  note: z.string().trim().max(200).optional(),
+});
+export type CreateAllocationInput = z.infer<typeof createAllocationSchema>;
+
+export const listAllocationBatchesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListAllocationBatchesQuery = z.infer<typeof listAllocationBatchesQuerySchema>;
+
+export const listMarkingTasksQuerySchema = z.object({
+  status: z.enum(MARKING_TASK_STATUSES).optional(),
+  examId: idSchema.optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListMarkingTasksQuery = z.infer<typeof listMarkingTasksQuerySchema>;

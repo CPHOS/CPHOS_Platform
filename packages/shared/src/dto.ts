@@ -1,4 +1,4 @@
-import type { AccountRole, AuditStatus, ExamStatus, MemberRole, PaperStatus, UserStatus } from './enums.js';
+import type { AccountRole, AllocationStatus, AuditStatus, ExamStatus, MarkingTaskStatus, MemberRole, PaperStatus, UserStatus } from './enums.js';
 
 /** 当前登录用户（/api/auth/me 返回，BigInt 序列化为字符串） */
 export interface UserDto {
@@ -350,6 +350,80 @@ export interface PaperDto {
 
 export interface PaperListDto {
   items: PaperDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ---------- 考试域：M2-C 分配与双阅任务 ----------
+
+export interface AllocationSlotPreviewDto {
+  slot: number;
+  questionCount: number;
+  taskCount: number;
+  examinerCount: number;
+  minTasks: number;
+  maxTasks: number;
+}
+
+export interface AllocationPreviewDto {
+  examId: string;
+  examName: string;
+  readyPaperCount: number;
+  questionCount: number;
+  taskCount: number;
+  slots: AllocationSlotPreviewDto[];
+  unassignedSlots: number[];
+}
+
+export interface AllocationItemDto {
+  id: string;
+  batchId: string;
+  slot: number;
+  assigneeId: string;
+  assigneeName: string | null;
+  taskCount: number;
+}
+
+export interface AllocationBatchDto {
+  id: string;
+  examId: string;
+  examName: string;
+  status: AllocationStatus;
+  createdByName: string | null;
+  note: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+  totalTasks: number;
+  items: AllocationItemDto[];
+}
+
+export interface AllocationBatchListDto {
+  items: AllocationBatchDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface MarkingTaskDto {
+  id: string;
+  paperQuestionId: string;
+  paperId: string;
+  examId: string;
+  examName: string;
+  studentName: string;
+  slot: number;
+  questionLabel: string | null;
+  roundNo: number;
+  status: MarkingTaskStatus;
+  score: number | null;
+  assigneeId: string;
+  assigneeName: string | null;
+  createdAt: string;
+}
+
+export interface MarkingTaskListDto {
+  items: MarkingTaskDto[];
   total: number;
   page: number;
   pageSize: number;
