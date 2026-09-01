@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { ApartmentOutlined, AppstoreOutlined, AuditOutlined, DatabaseOutlined, HistoryOutlined, HomeOutlined, IdcardOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, AppstoreOutlined, AuditOutlined, DatabaseOutlined, HistoryOutlined, HomeOutlined, IdcardOutlined, ScheduleOutlined, SolutionOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { RequireAuth } from './components/RequireAuth';
 import { ShellLayout } from './layouts/ShellLayout';
 import { AdminHome } from './pages/admin/Home';
@@ -10,6 +10,8 @@ import { MembersList } from './pages/admin/members/List';
 import { TeamsList } from './pages/admin/teams/List';
 import { AuditLogsList } from './pages/admin/logs/List';
 import { DictAdminPage } from './pages/admin/dict/List';
+import { ExamsAdminPage } from './pages/admin/exams/List';
+import { AdminStudentsPage } from './pages/admin/students/List';
 import { LoginPage } from './pages/auth/Login';
 import { RegisterPage } from './pages/auth/Register';
 import { ForgotPasswordPage } from './pages/auth/ForgotPassword';
@@ -17,6 +19,7 @@ import { VerifyEmailPage } from './pages/auth/VerifyEmail';
 import { CphosHome } from './pages/cphos/Home';
 import { PlatformHome } from './pages/platform/Home';
 import { ProfilePage } from './pages/Profile';
+import { StudentsPage } from './pages/platform/Students';
 
 /**
  * 三端路由：
@@ -49,6 +52,7 @@ export function App() {
               kind="platform"
               nav={[
                 { key: '/app', label: '工作台', icon: <HomeOutlined /> },
+                { key: '/app/students', label: '学生名册', icon: <SolutionOutlined /> },
                 { key: '/app/profile', label: '个人信息', icon: <IdcardOutlined /> },
               ]}
             />
@@ -56,6 +60,7 @@ export function App() {
         }
       >
         <Route index element={<PlatformHome />} />
+        <Route path="students" element={<StudentsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
@@ -88,6 +93,8 @@ export function App() {
                 { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined /> },
                 { key: '/admin/members', label: '成员管理', icon: <TeamOutlined /> },
                 { key: '/admin/teams', label: '团队管理', icon: <ApartmentOutlined /> },
+                { key: '/admin/exams', label: '考试管理', icon: <ScheduleOutlined /> },
+                { key: '/admin/students', label: '学生名册', icon: <SolutionOutlined /> },
                 { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined /> },
                 { key: '/admin/dict', label: '字典维护', icon: <DatabaseOutlined /> },
                 { key: '/admin/logs', label: '审计日志', icon: <HistoryOutlined /> },
@@ -102,6 +109,8 @@ export function App() {
         <Route path="audit/:id" element={<AuditDetail />} />
         <Route path="members" element={<MembersList />} />
         <Route path="teams" element={<TeamsList />} />
+        <Route path="exams" element={<ExamsAdminPage />} />
+        <Route path="students" element={<AdminStudentsPage />} />
         <Route path="accounts" element={<AccountsList />} />
         <Route path="dict" element={<DictAdminPage />} />
         <Route path="logs" element={<AuditLogsList />} />

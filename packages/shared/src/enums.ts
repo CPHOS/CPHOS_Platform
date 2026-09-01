@@ -43,6 +43,17 @@ export const ROLE_LABELS: Record<MemberRole, string> = {
   COACH: '附属教练',
 };
 
+/** 考试状态机 */
+export const EXAM_STATUSES = ['DRAFT', 'PUBLISHED', 'CLOSED', 'ARCHIVED'] as const;
+export type ExamStatus = (typeof EXAM_STATUSES)[number];
+
+export const EXAM_STATUS_LABELS: Record<ExamStatus, string> = {
+  DRAFT: '草稿',
+  PUBLISHED: '已发布',
+  CLOSED: '已结束',
+  ARCHIVED: '已归档',
+};
+
 export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   PENDING: '待审核',
   ACTIVE: '正常',
@@ -66,6 +77,15 @@ export const AUDIT_ACTIONS = [
   'TEAM_CREATE',
   'TEAM_UPDATE',
   'TEAM_DELETE',
+  'EXAM_CREATE',
+  'EXAM_UPDATE',
+  'EXAM_CONFIG',
+  'EXAM_PUBLISH',
+  'EXAM_CLOSE',
+  'EXAM_ARCHIVE',
+  'STUDENT_CREATE',
+  'STUDENT_UPDATE',
+  'STUDENT_DELETE',
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
 
@@ -82,6 +102,15 @@ export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
   TEAM_CREATE: '创建团队',
   TEAM_UPDATE: '更新团队',
   TEAM_DELETE: '删除团队',
+  EXAM_CREATE: '创建考试',
+  EXAM_UPDATE: '更新考试',
+  EXAM_CONFIG: '更新考试配置',
+  EXAM_PUBLISH: '发布考试',
+  EXAM_CLOSE: '结束考试',
+  EXAM_ARCHIVE: '归档考试',
+  STUDENT_CREATE: '新增学生',
+  STUDENT_UPDATE: '更新学生',
+  STUDENT_DELETE: '归档学生',
 };
 
 /** 字典类型（后台维护页签） */
