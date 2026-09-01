@@ -54,6 +54,16 @@ export const EXAM_STATUS_LABELS: Record<ExamStatus, string> = {
   ARCHIVED: '已归档',
 };
 
+/** 整卷状态 */
+export const PAPER_STATUSES = ['UPLOADING', 'READY', 'ARCHIVED'] as const;
+export type PaperStatus = (typeof PAPER_STATUSES)[number];
+
+export const PAPER_STATUS_LABELS: Record<PaperStatus, string> = {
+  UPLOADING: '上传中',
+  READY: '已就绪',
+  ARCHIVED: '已归档',
+};
+
 export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   PENDING: '待审核',
   ACTIVE: '正常',
@@ -86,6 +96,11 @@ export const AUDIT_ACTIONS = [
   'STUDENT_CREATE',
   'STUDENT_UPDATE',
   'STUDENT_DELETE',
+  'PAPER_CREATE',
+  'PAPER_PAGE_ADD',
+  'PAPER_QUESTION_BIND',
+  'PAPER_READY',
+  'PAPER_ARCHIVE',
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
 
@@ -111,6 +126,11 @@ export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
   STUDENT_CREATE: '新增学生',
   STUDENT_UPDATE: '更新学生',
   STUDENT_DELETE: '归档学生',
+  PAPER_CREATE: '创建整卷',
+  PAPER_PAGE_ADD: '添加答题卡页',
+  PAPER_QUESTION_BIND: '绑定题目图片',
+  PAPER_READY: '整卷标记完成',
+  PAPER_ARCHIVE: '归档整卷',
 };
 
 /** 字典类型（后台维护页签） */

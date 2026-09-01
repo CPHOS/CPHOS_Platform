@@ -1,4 +1,4 @@
-import type { AccountRole, AuditStatus, ExamStatus, MemberRole, UserStatus } from './enums.js';
+import type { AccountRole, AuditStatus, ExamStatus, MemberRole, PaperStatus, UserStatus } from './enums.js';
 
 /** 当前登录用户（/api/auth/me 返回，BigInt 序列化为字符串） */
 export interface UserDto {
@@ -288,6 +288,68 @@ export interface StudentDto {
 
 export interface StudentListDto {
   items: StudentDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ---------- 考试域：M2-B 整卷 / 答题卡页 / 题目图片 ----------
+
+export interface CropDto {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PaperPageDto {
+  id: string;
+  pageNo: number;
+  fileKey: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  createdAt: string;
+}
+
+export interface QuestionImageDto {
+  id: string;
+  paperQuestionId: string;
+  paperPageId: string;
+  partIndex: number;
+  crop: CropDto | null;
+  fileKey: string | null;
+  pageNo: number;
+  pageFileKey: string;
+  createdAt: string;
+}
+
+export interface PaperQuestionDto {
+  id: string;
+  slot: number;
+  questionLabel: string | null;
+  maxScore: number;
+  finalScore: number | null;
+  images: QuestionImageDto[];
+  updatedAt: string;
+}
+
+export interface PaperDto {
+  id: string;
+  examId: string;
+  examName: string;
+  studentId: string;
+  studentName: string;
+  uploadedById: string;
+  uploadedByName: string | null;
+  status: PaperStatus;
+  pages: PaperPageDto[];
+  questions: PaperQuestionDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaperListDto {
+  items: PaperDto[];
   total: number;
   page: number;
   pageSize: number;

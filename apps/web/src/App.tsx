@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { ApartmentOutlined, AppstoreOutlined, AuditOutlined, DatabaseOutlined, HistoryOutlined, HomeOutlined, IdcardOutlined, ScheduleOutlined, SolutionOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, AppstoreOutlined, AuditOutlined, CloudUploadOutlined, DatabaseOutlined, HistoryOutlined, HomeOutlined, IdcardOutlined, ScheduleOutlined, SolutionOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { RequireAuth } from './components/RequireAuth';
 import { ShellLayout } from './layouts/ShellLayout';
 import { AdminHome } from './pages/admin/Home';
@@ -20,6 +20,7 @@ import { CphosHome } from './pages/cphos/Home';
 import { PlatformHome } from './pages/platform/Home';
 import { ProfilePage } from './pages/Profile';
 import { StudentsPage } from './pages/platform/Students';
+import { PapersPage } from './pages/platform/Papers';
 
 /**
  * 三端路由：
@@ -53,6 +54,7 @@ export function App() {
               nav={[
                 { key: '/app', label: '工作台', icon: <HomeOutlined /> },
                 { key: '/app/students', label: '学生名册', icon: <SolutionOutlined /> },
+                { key: '/app/papers', label: '整卷上传', icon: <CloudUploadOutlined /> },
                 { key: '/app/profile', label: '个人信息', icon: <IdcardOutlined /> },
               ]}
             />
@@ -61,6 +63,7 @@ export function App() {
       >
         <Route index element={<PlatformHome />} />
         <Route path="students" element={<StudentsPage />} />
+        <Route path="papers" element={<PapersPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

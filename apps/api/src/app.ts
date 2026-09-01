@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import { env } from './env.js';
@@ -17,8 +18,11 @@ import { adminAccountRoutes } from './modules/members/accounts.admin.routes.js';
 import { adminTeamRoutes } from './modules/teams/teams.admin.routes.js';
 import { adminDictRoutes } from './modules/dict/dict.admin.routes.js';
 import { adminExamRoutes } from './modules/exams/exams.admin.routes.js';
+import { examRoutes } from './modules/exams/exams.routes.js';
 import { studentRoutes } from './modules/students/students.routes.js';
 import { adminStudentRoutes } from './modules/students/students.admin.routes.js';
+import { paperRoutes } from './modules/papers/papers.routes.js';
+import { adminPaperRoutes } from './modules/papers/papers.admin.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -33,6 +37,9 @@ export async function buildApp() {
     credentials: true,
   });
   await app.register(cookie);
+  await app.register(multipart, {
+    limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+  });
   await app.register(jwt, {
     secret: env.JWT_SECRET,
     sign: { expiresIn: env.ACCESS_TOKEN_TTL },
@@ -62,8 +69,11 @@ export async function buildApp() {
   await app.register(adminTeamRoutes, { prefix: '/api/admin' });
   await app.register(adminDictRoutes, { prefix: '/api/admin' });
   await app.register(adminExamRoutes, { prefix: '/api/admin' });
+  await app.register(examRoutes, { prefix: '/api' });
   await app.register(studentRoutes, { prefix: '/api' });
   await app.register(adminStudentRoutes, { prefix: '/api/admin' });
+  await app.register(paperRoutes, { prefix: '/api' });
+  await app.register(adminPaperRoutes, { prefix: '/api/admin' });
 
   return app;
 }

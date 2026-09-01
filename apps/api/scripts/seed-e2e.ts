@@ -21,7 +21,7 @@ async function main() {
 
   // 清空业务表（保留字典；CASCADE 处理外键）
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "AuditMaterial", "AuditApplication", "AuditLog", "RefreshToken", "EmailCode", "MemberProfile", "Team", "UserAccount" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "AuditMaterial", "AuditApplication", "AuditLog", "RefreshToken", "EmailCode", "QuestionImage", "PaperQuestion", "PaperPage", "Paper", "MemberProfile", "Team", "UserAccount" RESTART IDENTITY CASCADE',
   );
 
   // 保证有一个可用赛区/学校（自增 ID）

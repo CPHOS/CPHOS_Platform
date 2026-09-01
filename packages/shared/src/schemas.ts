@@ -6,6 +6,7 @@ import {
   EMAIL_CODE_PURPOSES,
   EXAM_STATUSES,
   MEMBER_ROLES,
+  PAPER_STATUSES,
   USER_STATUSES,
 } from './enums.js';
 
@@ -315,3 +316,56 @@ export const listStudentsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type ListStudentsQuery = z.infer<typeof listStudentsQuerySchema>;
+
+// ---------- 考试域：M2-B 整卷 / 答题卡页 / 题目图片 ----------
+
+export const createPaperSchema = z.object({
+  examId: idSchema,
+  studentId: idSchema,
+});
+export type CreatePaperInput = z.infer<typeof createPaperSchema>;
+
+export const addPaperPageSchema = z.object({
+  pageNo: z.number().int().min(1).max(1000),
+  fileKey: z.string().trim().min(1, '缺少文件键').max(500),
+  mimeType: z.string().trim().max(100).optional(),
+  sizeBytes: z.number().int().min(0).max(200 * 1024 * 1024).optional(),
+});
+export type AddPaperPageInput = z.infer<typeof addPaperPageSchema>;
+
+export const cropSchema = z.object({
+  x: z.number().min(0),
+  y: z.number().min(0),
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+
+export const bindQuestionImageSchema = z.object({
+  paperQuestionId: idSchema,
+  paperPageId: idSchema,
+  partIndex: z.number().int().min(0).max(100).default(0),
+  crop: cropSchema.optional(),
+  fileKey: z.string().trim().max(500).optional(),
+});
+export type BindQuestionImageInput = z.infer<typeof bindQuestionImageSchema>;
+
+export const removeQuestionImageSchema = z.object({
+  paperQuestionId: idSchema,
+  paperPageId: idSchema,
+  partIndex: z.number().int().min(0).max(100).default(0),
+});
+export type RemoveQuestionImageInput = z.infer<typeof removeQuestionImageSchema>;
+
+export const setPaperStatusSchema = z.object({
+  status: z.enum(['READY', 'ARCHIVED']),
+});
+export type SetPaperStatusInput = z.infer<typeof setPaperStatusSchema>;
+
+export const listPapersQuerySchema = z.object({
+  examId: idSchema.optional(),
+  status: z.enum(PAPER_STATUSES).optional(),
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListPapersQuery = z.infer<typeof listPapersQuerySchema>;

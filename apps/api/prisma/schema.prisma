@@ -62,6 +62,11 @@ enum AuditAction {
   STUDENT_CREATE // 新增学生
   STUDENT_UPDATE // 更新学生
   STUDENT_DELETE // 归档学生
+  PAPER_CREATE // 创建整卷
+  PAPER_PAGE_ADD // 添加物理答题卡页
+  PAPER_QUESTION_BIND // 绑定/调整题目图片
+  PAPER_READY // 整卷标记完成
+  PAPER_ARCHIVE // 归档整卷
 }
 
 enum MemberRole {
@@ -208,7 +213,8 @@ model MemberProfile {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  students Student[]
+  students      Student[]
+  uploadedPapers Paper[]
 
   @@index([schoolId])
   @@index([teamId])
@@ -243,6 +249,8 @@ model Exam {
 
   config ExamConfig?
 
+  papers Paper[]
+
   @@index([status, createdAt])
 }
 
@@ -275,11 +283,93 @@ model Student {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  papers Paper[]
+
   @@index([ownerId, archivedAt])
   @@index([name])
   @@index([schoolId])
   @@index([gradeId])
   @@index([prizeId])
+}
+
+// ---------- 考试域：M2-B 整卷 / 物理页 / 逻辑题 / 题目图片 ----------
+
+enum PaperStatus {
+  UPLOADING
+  READY
+  ARCHIVED
+}
+
+model Paper {
+  id           BigInt      @id @default(autoincrement())
+  examId       BigInt
+  exam         Exam        @relation(fields: [examId], references: [id], onDelete: Restrict)
+  studentId    BigInt
+  student      Student     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  uploadedById BigInt
+  uploadedBy   MemberProfile @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  status       PaperStatus @default(UPLOADING)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  pages     PaperPage[]
+  questions PaperQuestion[]
+
+  @@unique([examId, studentId])
+  @@index([examId, status])
+  @@index([studentId])
+  @@index([uploadedById])
+}
+
+model PaperPage {
+  id        BigInt   @id @default(autoincrement())
+  paperId   BigInt
+  paper     Paper    @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  pageNo    Int
+  fileKey   String
+  mimeType  String?
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+
+  questionImages QuestionImage[]
+
+  @@unique([paperId, pageNo])
+  @@index([paperId])
+}
+
+model PaperQuestion {
+  id            BigInt   @id @default(autoincrement())
+  paperId       BigInt
+  paper         Paper    @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  slot          Int
+  questionLabel String?
+  maxScore      Decimal  @default(0) @db.Decimal(8, 2)
+  finalScore    Decimal? @db.Decimal(8, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  images QuestionImage[]
+
+  @@unique([paperId, slot])
+  @@index([paperId])
+}
+
+model QuestionImage {
+  id              BigInt   @id @default(autoincrement())
+  paperQuestionId BigInt
+  paperQuestion   PaperQuestion @relation(fields: [paperQuestionId], references: [id], onDelete: Cascade)
+  paperPageId     BigInt
+  paperPage       PaperPage     @relation(fields: [paperPageId], references: [id], onDelete: Cascade)
+  // 一道题在同一页/多页中的第几段，用于一题多片段
+  partIndex       Int      @default(0)
+  // 可选裁剪区域：{x,y,width,height}
+  crop            Json?
+  fileKey         String?
+  createdAt       DateTime @default(now())
+
+  @@unique([paperQuestionId, paperPageId, partIndex])
+  @@index([paperQuestionId])
+  @@index([paperPageId])
 }
 
 // ---------- 主数据字典（新系统自增 ID，管理员维护） ----------

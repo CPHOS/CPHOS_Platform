@@ -18,6 +18,8 @@ const schema = z
     CODE_TTL_MINUTES: z.coerce.number().default(10),
     CODE_SALT: z.string().default(INSECURE_CODE_SALT_DEFAULT),
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
+    // 本地开发文件存储；生产应替换为对象存储适配器
+    UPLOAD_DIR: z.string().default('.uploads'),
     // SMTP 可选：配置后走真实发信；未配置时开发模式写入 .devmail/ 并在日志打印验证码
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().optional(),
