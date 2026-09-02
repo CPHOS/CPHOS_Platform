@@ -14,6 +14,7 @@ export const E2E_ACCOUNTS = {
   rankCoach: { email: 'e2e.rank.coach@example.com', displayName: 'E2E 排名教练', password: 'E2eRankCoach123!' },
   rankCoach2: { email: 'e2e.rank.coach2@example.com', displayName: 'E2E 排名教练乙', password: 'E2eRankCoach123!' },
   rankCoach3: { email: 'e2e.rank.coach3@example.com', displayName: 'E2E 排名教练丙', password: 'E2eRankCoach123!' },
+  rankCoach4: { email: 'e2e.rank.coach4@example.com', displayName: 'E2E 排名教练丁', password: 'E2eRankCoach123!' },
   reset: { email: 'e2e.reset@example.com', displayName: 'E2E 重置用户', password: 'E2eReset123!' },
   email: { email: 'e2e.email@example.com', displayName: 'E2E 换绑用户', password: 'E2eEmail123!' },
 } as const;
@@ -168,6 +169,7 @@ async function main() {
   for (const [u, slot] of [
     [E2E_ACCOUNTS.rankCoach2, 1],
     [E2E_ACCOUNTS.rankCoach3, 2],
+    [E2E_ACCOUNTS.rankCoach4, 1],
   ] as const) {
     const account = await prisma.userAccount.create({
       data: {

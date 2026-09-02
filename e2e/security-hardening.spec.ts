@@ -150,34 +150,33 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   });
   expect(activeCountChange.status()).toBe(400);
 
-  // 分差触发仲裁；此时结束考试应被拒绝
-  const tasks = await request.get('/api/tasks/mine', { headers: coachAuth }).then((r: any) => r.json());
-  const myTasks = tasks.items.filter((t: any) => t.examId === exam.id);
-  expect(myTasks.length).toBe(2);
-  for (const task of myTasks) {
-    const grade = await request.post('/api/tasks/' + task.id + '/grade', {
-      headers: coachAuth,
-      data: { score: task.roundNo === 1 ? 5 : 10 },
-    });
-    expect(grade.ok()).toBeTruthy();
+  // 分差触发仲裁；平台端两名不同阅卷人完成第一评/第二评
+  const reviewerAccounts = [ACCOUNTS.rankCoach, ACCOUNTS.rankCoach2, ACCOUNTS.rankCoach4];
+  const examinerTasks: { token: string; task: any }[] = [];
+  for (const account of reviewerAccounts) {
+    const token = await apiLogin(request, account.account, account.password);
+    const body = await request
+      .get('/api/tasks/mine', { headers: { Authorization: 'Bearer ' + token } })
+      .then((r: any) => r.json());
+    for (const task of body.items.filter((t: any) => t.examId === exam.id)) {
+      examinerTasks.push({ token, task });
+    }
   }
-  // 第二名阅卷人独立完成第二评
-  const secondToken = await apiLogin(request, ACCOUNTS.rankCoach2.account, ACCOUNTS.rankCoach2.password);
-  const secondAuth = { Authorization: 'Bearer ' + secondToken };
-  const secondTasks = await request
-    .get('/api/tasks/mine', { headers: secondAuth })
-    .then((r: any) => r.json());
-  const mySecondTasks = secondTasks.items.filter((t: any) => t.examId === exam.id);
-  expect(mySecondTasks.length).toBe(2);
-  for (const task of myTasks) {
-    const peer = mySecondTasks.find((t: any) => t.paperQuestionId === task.paperQuestionId);
-    expect(peer).toBeTruthy();
-    expect(peer.assigneeId).not.toBe(task.assigneeId);
+  expect(examinerTasks.length).toBe(4);
+  const byQuestion = new Map<string, typeof examinerTasks>();
+  for (const row of examinerTasks) {
+    const list = byQuestion.get(row.task.paperQuestionId) ?? [];
+    list.push(row);
+    byQuestion.set(row.task.paperQuestionId, list);
   }
-  for (const task of mySecondTasks) {
-    const grade = await request.post('/api/tasks/' + task.id + '/grade', {
-      headers: secondAuth,
-      data: { score: 10 },
+  for (const list of byQuestion.values()) {
+    expect(list.length).toBe(2);
+    expect(new Set(list.map((x) => x.task.assigneeId)).size).toBe(2);
+  }
+  for (const row of examinerTasks) {
+    const grade = await request.post('/api/tasks/' + row.task.id + '/grade', {
+      headers: { Authorization: 'Bearer ' + row.token },
+      data: { score: row.task.roundNo === 1 ? 5 : 10 },
     });
     expect(grade.ok()).toBeTruthy();
   }
