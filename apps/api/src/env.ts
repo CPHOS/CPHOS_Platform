@@ -30,6 +30,7 @@ const schema = z
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
     // 本地开发文件存储；生产应替换为对象存储适配器
     UPLOAD_DIR: z.string().default('.uploads'),
+    OBJECT_STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
     UPLOAD_MAX_MB: z.coerce.number().default(20),
     PAPER_MAX_PAGES: z.coerce.number().default(50),
     BODY_LIMIT_MB: z.coerce.number().default(1),

@@ -106,8 +106,20 @@ pnpm --filter @cphos/api task:check-duplicates
 #    生产安装需保留 devDependencies 或使用同一 Prisma 版本的 pnpm dlx
 pnpm --filter @cphos/api exec prisma generate
 pnpm --filter @cphos/api exec prisma db push
+#    旧 PaperPage.fileKey 回填为 StoredObject 元数据（不移动原文件）
+pnpm --filter @cphos/api object:backfill
 # 3) 启动并通过就绪探针
 curl -fsS http://127.0.0.1:3001/api/health/ready
 ```
 
 生产必须显式配置：`NODE_ENV=production`、`HOST=127.0.0.1`、正式 `DATABASE_URL`、强随机 `JWT_SECRET`/`CODE_SALT`、`CORS_ORIGIN`、SMTP；上传目录建议使用单机持久盘或后续替换对象存储，并纳入备份。
+
+## 对象存储
+
+当前采用与 Question_DB 对齐的“文件系统对象存储 + DB 元数据”方案：
+
+- `StoredObject` 记录文件名/MIME/大小/SHA-256/相对路径
+- 文件先写入 `UPLOAD_DIR`，再在事务内写对象与 PaperPage 元数据
+- 旧 `PaperPage.fileKey` 数据可运行 `pnpm --filter @cphos/api object:backfill` 回填 `StoredObject`
+- `OBJECT_STORAGE_DRIVER=local` 默认；未来接 MinIO/S3 时在对象存储层增加 adapter
+- Docker 使用 `cphos-uploads` volume；备份参见上文 tar/卷备份命令

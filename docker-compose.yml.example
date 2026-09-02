@@ -9,6 +9,7 @@ x-api-env: &api-env
   CODE_SALT: CHANGE_ME_INDEPENDENT_32
   CORS_ORIGIN: https://exam.example.com
   UPLOAD_DIR: /data/uploads
+  OBJECT_STORAGE_DRIVER: local
   UPLOAD_MAX_MB: '20'
   PAPER_MAX_PAGES: '50'
   TRUST_PROXY: 'true'

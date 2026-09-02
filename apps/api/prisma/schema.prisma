@@ -377,6 +377,9 @@ model PaperPage {
   paper     Paper    @relation(fields: [paperId], references: [id], onDelete: Cascade)
   pageNo    Int
   fileKey   String
+  // 对象存储元数据；旧数据可为 null，读取时回退 fileKey
+  objectId  String?  @unique
+  object    StoredObject? @relation(fields: [objectId], references: [id], onDelete: SetNull)
   mimeType  String?
   sizeBytes Int?
   createdAt DateTime @default(now())
@@ -404,6 +407,25 @@ model PaperQuestion {
 
   @@unique([paperId, slot])
   @@index([paperId])
+}
+
+
+// ---------- 对象存储：filesystem-backed object store（对齐 Question_DB） ----------
+model StoredObject {
+  id           String   @id @default(uuid())
+  fileName     String
+  mimeType     String?
+  sizeBytes    Int
+  contentHash  String // sha256 hex
+  storagePath  String   @unique // 相对 UPLOAD_DIR，如 papers/<id>/<uuid>.png
+  // 兼容未来从 BYTEA 迁移的历史内容；新对象为 null
+  legacyContent Bytes?
+  createdAt    DateTime @default(now())
+
+  pages PaperPage[]
+
+  @@index([contentHash])
+  @@index([storagePath])
 }
 
 model QuestionImage {

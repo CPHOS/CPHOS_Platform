@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "task:check-duplicates": "tsx scripts/check-duplicate-tasks.ts",
+    "object:backfill": "tsx scripts/backfill-object-store.ts",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",

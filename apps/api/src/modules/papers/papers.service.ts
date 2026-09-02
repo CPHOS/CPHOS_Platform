@@ -15,12 +15,15 @@ import type {
 } from '@cphos/shared';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import fs from 'node:fs/promises';
-import { createReadStream, existsSync, statSync } from 'node:fs';
-import path from 'node:path';
 import { prisma } from '../../db.js';
 import { env } from '../../env.js';
 import { Errors } from '../../lib/errors.js';
+import {
+  createStoredObject,
+  openObjectStream,
+  putObjectBytes,
+  removeObjectFile,
+} from '../../lib/object-store.js';
 
 const PAPER_INCLUDE = {
   exam: { select: { name: true, config: { select: { reviewCount: true } } } },
@@ -671,14 +674,6 @@ function safeUploadExt(mimeType: string): string {
   return ext;
 }
 
-function assertInsideUploadDir(absolutePath: string): void {
-  const uploadRoot = path.resolve(process.cwd(), env.UPLOAD_DIR);
-  const relative = path.relative(uploadRoot, absolutePath);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw Errors.validation('文件路径非法');
-  }
-}
-
 export async function uploadPaperPage(
   userId: bigint,
   paperId: bigint,
@@ -694,20 +689,26 @@ export async function uploadPaperPage(
 
   const fileKey =
     'papers/' + String(paperId) + '/' + randomUUID() + safeUploadExt(input.mimeType);
-  const absolute = path.resolve(process.cwd(), env.UPLOAD_DIR, fileKey);
-  assertInsideUploadDir(absolute);
-  await fs.mkdir(path.dirname(absolute), { recursive: true });
-  await fs.writeFile(absolute, input.buffer);
+  // 1) 先写文件，2) 事务内写 StoredObject + PaperPage 元数据
+  const stored = await putObjectBytes(fileKey, input.buffer);
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      const object = await createStoredObject(tx, {
+        fileName: input.originalName,
+        mimeType: input.mimeType,
+        sizeBytes: stored.sizeBytes,
+        contentHash: stored.contentHash,
+        storagePath: fileKey,
+      });
       await tx.paperPage.create({
         data: {
           paperId,
           pageNo: input.pageNo,
           fileKey,
+          objectId: object.id,
           mimeType: input.mimeType,
-          sizeBytes: input.sizeBytes,
+          sizeBytes: stored.sizeBytes,
         },
       });
       await writeAudit(tx, userId, 'PAPER_PAGE_ADD', paper, '上传答题卡页 ' + input.pageNo);
@@ -715,7 +716,7 @@ export async function uploadPaperPage(
     });
     return toPaperDto(updated);
   } catch (err) {
-    await fs.unlink(absolute).catch(() => undefined);
+    await removeObjectFile(fileKey);
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw Errors.validation('该页码已存在');
     }
@@ -735,30 +736,24 @@ export async function getPaperPageStream(
       paperId,
       paper: { uploadedById: profileId },
     },
-    select: { fileKey: true, mimeType: true },
+    select: {
+      fileKey: true,
+      mimeType: true,
+      object: { select: { storagePath: true, mimeType: true } },
+    },
   });
   if (!page) throw Errors.notFound('答题卡页');
-  const absolutePath = path.resolve(process.cwd(), env.UPLOAD_DIR, page.fileKey);
-  assertInsideUploadDir(absolutePath);
-  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) throw Errors.notFound('文件');
-  const mime = Object.keys(ALLOWED_UPLOAD_MIME).includes((page.mimeType ?? '').toLowerCase())
-    ? page.mimeType!
-    : 'application/octet-stream';
-  return { stream: createReadStream(absolutePath), mimeType: mime };
+  return openObjectStream(
+    page.object?.storagePath ?? page.fileKey,
+    page.object?.mimeType ?? page.mimeType,
+  );
 }
 
 async function readStoredPage(fileKey: string, mimeType: string | null): Promise<{
   stream: NodeJS.ReadableStream;
   mimeType: string;
 }> {
-  const absolutePath = path.resolve(process.cwd(), env.UPLOAD_DIR, fileKey);
-  assertInsideUploadDir(absolutePath);
-  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) throw Errors.notFound('文件');
-  const allowed = Object.keys(ALLOWED_UPLOAD_MIME).includes((mimeType ?? '').toLowerCase());
-  return {
-    stream: createReadStream(absolutePath),
-    mimeType: allowed ? mimeType! : 'application/octet-stream',
-  };
+  return openObjectStream(fileKey, mimeType);
 }
 
 /** 阅卷人按任务读取答卷图片 */
@@ -780,10 +775,21 @@ export async function getMarkingTaskPageStream(
   if (!task) throw Errors.notFound('阅卷任务');
   const image = await prisma.questionImage.findFirst({
     where: { paperQuestionId: task.paperQuestionId, paperPageId: pageId },
-    select: { paperPage: { select: { fileKey: true, mimeType: true } } },
+    select: {
+      paperPage: {
+        select: {
+          fileKey: true,
+          mimeType: true,
+          object: { select: { storagePath: true, mimeType: true } },
+        },
+      },
+    },
   });
   if (!image) throw Errors.notFound('答题图片');
-  return readStoredPage(image.paperPage.fileKey, image.paperPage.mimeType);
+  return readStoredPage(
+    image.paperPage.object?.storagePath ?? image.paperPage.fileKey,
+    image.paperPage.object?.mimeType ?? image.paperPage.mimeType,
+  );
 }
 
 /** 仲裁人按仲裁任务读取答卷图片；PENDING 可由任一进入仲裁工作台者预览 */
@@ -806,8 +812,19 @@ export async function getArbitrationPageStream(
   }
   const image = await prisma.questionImage.findFirst({
     where: { paperQuestionId: arbitration.paperQuestionId, paperPageId: pageId },
-    select: { paperPage: { select: { fileKey: true, mimeType: true } } },
+    select: {
+      paperPage: {
+        select: {
+          fileKey: true,
+          mimeType: true,
+          object: { select: { storagePath: true, mimeType: true } },
+        },
+      },
+    },
   });
   if (!image) throw Errors.notFound('答题图片');
-  return readStoredPage(image.paperPage.fileKey, image.paperPage.mimeType);
+  return readStoredPage(
+    image.paperPage.object?.storagePath ?? image.paperPage.fileKey,
+    image.paperPage.object?.mimeType ?? image.paperPage.mimeType,
+  );
 }
