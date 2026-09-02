@@ -8,10 +8,58 @@ import type {
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db.js';
 import { Errors } from '../../lib/errors.js';
+import { hasArbitrationConflict } from './arbitration-policy.js';
 
 function userName(user: { displayName: string | null; loginName: string | null; email: string | null } | null | undefined): string | null {
   if (!user) return null;
   return user.displayName ?? user.loginName ?? user.email ?? null;
+}
+
+/** 校验操作者是否与题目上传者/学生/原阅卷人/团队/学校存在利益冲突 */
+export async function assertArbitrationAccess(userId: bigint, arbitrationId: bigint): Promise<void> {
+  const arbitration = await prisma.arbitration.findUnique({
+    where: { id: arbitrationId },
+    select: { paperQuestionId: true },
+  });
+  if (!arbitration) throw Errors.notFound('仲裁任务');
+  const [question, operatorProfile] = await Promise.all([
+    prisma.paperQuestion.findUnique({
+      where: { id: arbitration.paperQuestionId },
+      select: {
+        paper: {
+          select: {
+            uploadedBy: { select: { userId: true, teamId: true, schoolId: true } },
+            student: {
+              select: { owner: { select: { userId: true, teamId: true, schoolId: true } } },
+            },
+          },
+        },
+        markingTasks: {
+          where: { allocation: { status: 'ACTIVE' }, status: 'COMPLETED' },
+          select: { assignee: { select: { userId: true, teamId: true, schoolId: true } } },
+        },
+      },
+    }),
+    prisma.memberProfile.findUnique({
+      where: { userId },
+      select: { teamId: true, schoolId: true },
+    }),
+  ]);
+  if (!question) throw Errors.notFound('题目');
+  const reviewers = question.markingTasks.map((t) => t.assignee);
+  const conflict = hasArbitrationConflict({
+    operatorId: userId,
+    operatorTeamId: operatorProfile?.teamId ?? null,
+    operatorSchoolId: operatorProfile?.schoolId ?? null,
+    uploaderUserId: question.paper.uploadedBy.userId,
+    uploaderTeamId: question.paper.uploadedBy.teamId,
+    studentOwnerUserId: question.paper.student.owner.userId,
+    studentOwnerTeamId: question.paper.student.owner.teamId,
+    reviewerUserIds: reviewers.map((r) => r.userId),
+    reviewerTeamIds: reviewers.map((r) => r.teamId),
+    reviewerSchoolIds: reviewers.map((r) => r.schoolId),
+  });
+  if (conflict) throw Errors.forbidden();
 }
 
 async function recomputePaper(tx: Prisma.TransactionClient, paperId: bigint): Promise<void> {
@@ -254,6 +302,7 @@ export async function listArbitrations(
 }
 
 export async function claimArbitration(userId: bigint, id: bigint): Promise<void> {
+  await assertArbitrationAccess(userId, id);
   const existing = await prisma.arbitration.findUnique({
     where: { id },
     include: {
@@ -298,6 +347,7 @@ export async function gradeArbitration(
   id: bigint,
   input: GradeArbitrationInput,
 ): Promise<void> {
+  await assertArbitrationAccess(userId, id);
   const arbitration = await prisma.arbitration.findUnique({
     where: { id },
     include: {

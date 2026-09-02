@@ -6,7 +6,13 @@ import {
   listArbitrationsQuerySchema,
 } from '@cphos/shared';
 import { getArbitrationPageStream } from '../papers/papers.service.js';
-import { claimArbitration, gradeArbitration, gradeMarkingTask, listArbitrations } from './marking.service.js';
+import {
+  assertArbitrationAccess,
+  claimArbitration,
+  gradeArbitration,
+  gradeMarkingTask,
+  listArbitrations,
+} from './marking.service.js';
 
 /** 平台打分 + CPHOS 仲裁 */
 export async function markingRoutes(app: FastifyInstance): Promise<void> {
@@ -32,9 +38,11 @@ export async function markingRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/arbitration/tasks/:id/pages/:pageId/file', { onRequest: arbitrationGuard }, async (req, reply) => {
     const { id, pageId } = req.params as { id: string; pageId: string };
+    const arbitrationId = BigInt(idSchema.parse(id));
+    await assertArbitrationAccess(BigInt(req.user.sub), arbitrationId);
     const file = await getArbitrationPageStream(
       BigInt(req.user.sub),
-      BigInt(idSchema.parse(id)),
+      arbitrationId,
       BigInt(idSchema.parse(pageId)),
     );
     reply.type(file.mimeType);
