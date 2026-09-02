@@ -5,7 +5,7 @@ import {
   idSchema,
   listArbitrationsQuerySchema,
 } from '@cphos/shared';
-import { getArbitrationPageStream } from '../papers/papers.service.js';
+import { getArbitrationImageStream, getArbitrationPageStream } from '../papers/papers.service.js';
 import {
   assertArbitrationAccess,
   claimArbitration,
@@ -34,6 +34,20 @@ export async function markingRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/arbitration/tasks', { onRequest: arbitrationGuard }, async (req) => {
     return listArbitrations(BigInt(req.user.sub), listArbitrationsQuerySchema.parse(req.query));
+  });
+
+  app.get('/arbitration/tasks/:id/images/:imageId/file', { onRequest: arbitrationGuard }, async (req, reply) => {
+    const { id, imageId } = req.params as { id: string; imageId: string };
+    const arbitrationId = BigInt(idSchema.parse(id));
+    await assertArbitrationAccess(BigInt(req.user.sub), arbitrationId);
+    const file = await getArbitrationImageStream(
+      BigInt(req.user.sub),
+      arbitrationId,
+      BigInt(idSchema.parse(imageId)),
+    );
+    reply.type(file.mimeType);
+    reply.header('Cache-Control', 'private, no-store');
+    return reply.send(file.stream);
   });
 
   app.get('/arbitration/tasks/:id/pages/:pageId/file', { onRequest: arbitrationGuard }, async (req, reply) => {

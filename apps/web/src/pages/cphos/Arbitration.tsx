@@ -164,7 +164,7 @@ export function ArbitrationPage() {
               <AnswerImage
                 key={image.id}
                 imageKey={grading.id + ':' + image.id}
-                load={() => arbitrationApi.image(grading.id, image.paperPageId)}
+                load={() => arbitrationApi.image(grading.id, image.id)}
                 pageNo={image.pageNo}
                 partIndex={image.partIndex}
                 crop={image.crop}

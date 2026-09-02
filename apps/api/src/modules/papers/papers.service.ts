@@ -391,10 +391,13 @@ export async function bindQuestionImage(
   const pageId = BigInt(input.paperPageId);
   const question = paper.questions.find((q) => q.id === questionId);
   if (!question) throw Errors.notFound('题目');
-  if (!paper.pages.some((p) => p.id === pageId)) throw Errors.notFound('答题卡页');
+  const page = paper.pages.find((p) => p.id === pageId);
+  if (!page) throw Errors.notFound('答题卡页');
   if (input.fileKey && !input.fileKey.startsWith('papers/' + String(paperId) + '/')) {
     throw Errors.validation('文件键必须属于当前整卷');
   }
+  // 未显式提供时，逐图 fileKey 继承所属页文件，保证 DTO 始终可定位
+  const resolvedFileKey = input.fileKey ?? page.fileKey;
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.questionImage.upsert({
@@ -410,11 +413,11 @@ export async function bindQuestionImage(
         paperPageId: pageId,
         partIndex: input.partIndex,
         crop: input.crop ?? Prisma.JsonNull,
-        fileKey: input.fileKey ?? null,
+        fileKey: resolvedFileKey,
       },
       update: {
         crop: input.crop ?? Prisma.JsonNull,
-        fileKey: input.fileKey ?? null,
+        fileKey: resolvedFileKey,
       },
     });
     await writeAudit(tx, userId, 'PAPER_QUESTION_BIND', paper, '绑定题目槽位 ' + question.slot);
@@ -754,6 +757,78 @@ async function readStoredPage(fileKey: string, mimeType: string | null): Promise
   mimeType: string;
 }> {
   return openObjectStream(fileKey, mimeType);
+}
+
+
+/** 阅卷人按逐图 QuestionImage 读取答卷图片 */
+export async function getMarkingTaskImageStream(
+  userId: bigint,
+  taskId: bigint,
+  imageId: bigint,
+): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+  const profileId = await getProfileId(userId);
+  const task = await prisma.markingTask.findFirst({
+    where: {
+      id: taskId,
+      assigneeId: profileId,
+      allocation: { status: 'ACTIVE' },
+      paperQuestion: { paper: { status: { not: 'ARCHIVED' } } },
+    },
+    select: { paperQuestionId: true },
+  });
+  if (!task) throw Errors.notFound('阅卷任务');
+  const image = await prisma.questionImage.findFirst({
+    where: { id: imageId, paperQuestionId: task.paperQuestionId },
+    select: {
+      fileKey: true,
+      paperPage: {
+        select: {
+          fileKey: true,
+          mimeType: true,
+          object: { select: { storagePath: true, mimeType: true } },
+        },
+      },
+    },
+  });
+  if (!image) throw Errors.notFound('答题图片');
+  return readStoredPage(
+    image.fileKey ?? image.paperPage.object?.storagePath ?? image.paperPage.fileKey,
+    image.paperPage.object?.mimeType ?? image.paperPage.mimeType,
+  );
+}
+
+/** 仲裁人按逐图 QuestionImage 读取答卷图片 */
+export async function getArbitrationImageStream(
+  userId: bigint,
+  arbitrationId: bigint,
+  imageId: bigint,
+): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+  const arbitration = await prisma.arbitration.findUnique({
+    where: { id: arbitrationId },
+    select: { status: true, claimedById: true, paperQuestionId: true },
+  });
+  if (!arbitration || arbitration.status === 'CANCELED') throw Errors.notFound('仲裁任务');
+  if (arbitration.claimedById && arbitration.claimedById !== userId) {
+    throw Errors.forbidden();
+  }
+  const image = await prisma.questionImage.findFirst({
+    where: { id: imageId, paperQuestionId: arbitration.paperQuestionId },
+    select: {
+      fileKey: true,
+      paperPage: {
+        select: {
+          fileKey: true,
+          mimeType: true,
+          object: { select: { storagePath: true, mimeType: true } },
+        },
+      },
+    },
+  });
+  if (!image) throw Errors.notFound('答题图片');
+  return readStoredPage(
+    image.fileKey ?? image.paperPage.object?.storagePath ?? image.paperPage.fileKey,
+    image.paperPage.object?.mimeType ?? image.paperPage.mimeType,
+  );
 }
 
 /** 阅卷人按任务读取答卷图片 */

@@ -137,7 +137,7 @@ export function TasksPage() {
               <AnswerImage
                 key={image.id}
                 imageKey={grading.id + ':' + image.id}
-                load={() => markingApi.taskImage(grading.id, image.paperPageId)}
+                load={() => markingApi.taskImage(grading.id, image.id)}
                 pageNo={image.pageNo}
                 partIndex={image.partIndex}
                 crop={image.crop}

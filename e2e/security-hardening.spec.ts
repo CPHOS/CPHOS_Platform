@@ -71,6 +71,8 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   expect(crossDelete.status()).toBe(404);
   const afterA = await request.get('/api/papers/' + papers[0].id, { headers: coachAuth }).then((r: any) => r.json());
   expect(afterA.questions[0].images.length).toBe(1);
+  // 未显式传 fileKey 时，逐图 fileKey 继承所属页
+  expect(afterA.questions[0].images[0].fileKey).toBe(afterA.pages[0].fileKey);
   const fullB = await request.get('/api/papers/' + papers[1].id, { headers: coachAuth }).then((r: any) => r.json());
   await request.post('/api/papers/' + papers[1].id + '/images', {
     headers: coachAuth,

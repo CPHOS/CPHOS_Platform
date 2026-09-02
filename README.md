@@ -120,6 +120,7 @@ curl -fsS http://127.0.0.1:3001/api/health/ready
 
 - `StoredObject` 记录文件名/MIME/大小/SHA-256/相对路径
 - 文件先写入 `UPLOAD_DIR`，再在事务内写对象与 PaperPage 元数据
+- 逐图 `QuestionImage.fileKey` 未显式提供时继承所属 PaperPage，阅卷/仲裁按 imageId 读取并复用裁剪坐标
 - 旧 `PaperPage.fileKey` 数据可运行 `pnpm --filter @cphos/api object:backfill` 回填 `StoredObject`
 - `OBJECT_STORAGE_DRIVER=local` 默认；未来接 MinIO/S3 时在对象存储层增加 adapter
 - Docker 使用 `cphos-uploads` volume；备份参见上文 tar/卷备份命令

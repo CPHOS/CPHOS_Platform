@@ -12,9 +12,9 @@ export const markingApi = {
   gradeTask: (taskId: string, input: GradeMarkingTaskInput) =>
     http.post<MessageResponse>('/tasks/' + taskId + '/grade', input).then((r) => r.data),
 
-  taskImage: (taskId: string, pageId: string) =>
+  taskImage: (taskId: string, imageId: string) =>
     http
-      .get<Blob>('/tasks/' + taskId + '/pages/' + pageId + '/file', { responseType: 'blob' })
+      .get<Blob>('/tasks/' + taskId + '/images/' + imageId + '/file', { responseType: 'blob' })
       .then((r) => r.data),
 };
 
@@ -28,9 +28,9 @@ export const arbitrationApi = {
   grade: (id: string, input: GradeArbitrationInput) =>
     http.post<MessageResponse>('/arbitration/tasks/' + id + '/grade', input).then((r) => r.data),
 
-  image: (id: string, pageId: string) =>
+  image: (id: string, imageId: string) =>
     http
-      .get<Blob>('/arbitration/tasks/' + id + '/pages/' + pageId + '/file', { responseType: 'blob' })
+      .get<Blob>('/arbitration/tasks/' + id + '/images/' + imageId + '/file', { responseType: 'blob' })
       .then((r) => r.data),
 };
 
