@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { uploadPaperPage } from './helpers';
 
 async function apiLogin(request: any, account: string, password: string): Promise<string> {
   const res = await request.post('/api/auth/login', { data: { account, password } });
@@ -42,11 +43,8 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
         .then((r: any) => r.json()),
     ),
   );
-  for (const [index, paper] of papers.entries()) {
-    await request.post('/api/papers/' + paper.id + '/pages', {
-      headers: coachAuth,
-      data: { pageNo: 1, fileKey: 'papers/' + paper.id + '/p' + index + '.png' },
-    });
+  for (const paper of papers) {
+    await uploadPaperPage(request, coachAuth, paper.id, 1);
   }
 
   // C1 路径穿越应被 schema 拒绝
@@ -55,6 +53,13 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
     data: { pageNo: 2, fileKey: '../../.env' },
   });
   expect(traversal.status()).toBe(400);
+
+  // C1b 合法格式但物理不存在的文件键不得登记 StoredObject
+  const ghost = await request.post('/api/papers/' + papers[0].id + '/pages', {
+    headers: coachAuth,
+    data: { pageNo: 2, fileKey: 'papers/' + papers[0].id + '/ghost.png' },
+  });
+  expect(ghost.status()).toBe(400);
 
   // C2 跨卷删除应 404，且原绑定保留
   const fullA = await request.get('/api/papers/' + papers[0].id, { headers: coachAuth }).then((r: any) => r.json());
@@ -71,8 +76,13 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   expect(crossDelete.status()).toBe(404);
   const afterA = await request.get('/api/papers/' + papers[0].id, { headers: coachAuth }).then((r: any) => r.json());
   expect(afterA.questions[0].images.length).toBe(1);
-  // 未显式传 fileKey 时，逐图 fileKey 继承所属页
-  expect(afterA.questions[0].images[0].fileKey).toBe(afterA.pages[0].fileKey);
+  expect(afterA.questions[0].images[0].paperPageId).toBe(afterA.pages[0].id);
+  const pageFile = await request.get('/api/papers/' + papers[0].id + '/pages/' + pageA.id + '/file', {
+    headers: coachAuth,
+  });
+  expect(pageFile.ok()).toBeTruthy();
+  expect(pageFile.headers()['content-type']).toContain('image/png');
+  expect((await pageFile.body()).length).toBeGreaterThan(0);
   const fullB = await request.get('/api/papers/' + papers[1].id, { headers: coachAuth }).then((r: any) => r.json());
   await request.post('/api/papers/' + papers[1].id + '/images', {
     headers: coachAuth,

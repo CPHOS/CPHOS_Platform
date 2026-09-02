@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { uploadPaperPage } from './helpers';
 
 async function apiLogin(request: any, account: string, password: string): Promise<string> {
   const res = await request.post('/api/auth/login', { data: { account, password } });
@@ -27,10 +28,7 @@ async function setupThreeReviewExam(request: any, adminAuth: any, suffix: string
   const paper = await request
     .post('/api/papers', { headers: coachAuth, data: { examId: exam.id, studentId: student.id } })
     .then((r: any) => r.json());
-  await request.post('/api/papers/' + paper.id + '/pages', {
-    headers: coachAuth,
-    data: { pageNo: 1, fileKey: 'papers/' + paper.id + '/n3.png' },
-  });
+  await uploadPaperPage(request, coachAuth, paper.id, 1);
   const full = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());
   await request.post('/api/papers/' + paper.id + '/images', {
     headers: coachAuth,
@@ -80,6 +78,9 @@ test('M2-E N=3 不同阅卷人：均值舍入与超分差仲裁', async ({ reque
   // 个人参赛者即使有槽位也不接单
   const personal = await tasksFor(request, { account: 'e2e.personal@example.com', password: 'E2ePersonal123!' }, meanExam.exam.id);
   expect(personal.tasks.length).toBe(0);
+  // 校名不是“个人”但 isIndividual=true 的成员同样不接单
+  const specialIndividual = await tasksFor(request, ACCOUNTS.specialIndividual, meanExam.exam.id);
+  expect(specialIndividual.tasks.length).toBe(0);
 
   const meanScores = [8.33, 8.34, 8.36];
   for (let i = 0; i < meanReviewers.length; i += 1) {
@@ -96,12 +97,23 @@ test('M2-E N=3 不同阅卷人：均值舍入与超分差仲裁', async ({ reque
   expect(ownerMean.ok()).toBeTruthy();
   expect((await ownerMean.json()).questions[0].finalScore).toBe(8.34);
 
-  // 已定稿批次可审计重分/重开，清空当前成绩并允许再次分配
-  const regrade = await request.post('/api/admin/allocation/batches/' + meanExam.batch.id + '/regrade', {
+  // 已定稿批次可审计重分/重开：原因必填且并发只能成功一次
+  const missingReason = await request.post('/api/admin/allocation/batches/' + meanExam.batch.id + '/regrade', {
     headers: adminAuth,
-    data: { reason: 'E2E 验证已定稿重分流程' },
+    data: { reason: '   ' },
   });
-  expect(regrade.ok()).toBeTruthy();
+  expect(missingReason.status()).toBe(400);
+  const [regradeA, regradeB] = await Promise.all([
+    request.post('/api/admin/allocation/batches/' + meanExam.batch.id + '/regrade', {
+      headers: adminAuth,
+      data: { reason: 'E2E 并发重分 A' },
+    }),
+    request.post('/api/admin/allocation/batches/' + meanExam.batch.id + '/regrade', {
+      headers: adminAuth,
+      data: { reason: 'E2E 并发重分 B' },
+    }),
+  ]);
+  expect([regradeA.ok(), regradeB.ok()].filter(Boolean).length).toBe(1);
   const reopened = await request.get('/api/papers/' + meanExam.paper.id, {
     headers: { Authorization: 'Bearer ' + ownerToken },
   });

@@ -5,8 +5,11 @@ export interface ArbitrationConflictContext {
   operatorSchoolId: bigint | null;
   uploaderUserId: bigint;
   uploaderTeamId: bigint | null;
+  uploaderSchoolId: bigint | null;
   studentOwnerUserId: bigint | null;
   studentOwnerTeamId: bigint | null;
+  studentOwnerSchoolId: bigint | null;
+  studentSchoolId: bigint | null;
   reviewerUserIds: bigint[];
   reviewerTeamIds: (bigint | null)[];
   reviewerSchoolIds: (bigint | null)[];
@@ -29,6 +32,10 @@ export function hasArbitrationConflict(ctx: ArbitrationConflictContext): boolean
     if (has(ctx.reviewerTeamIds, ctx.operatorTeamId)) return true;
   }
   if (ctx.operatorSchoolId !== null) {
+    // 同学校冲突覆盖上传者、学生 owner、学生本人学校与原阅卷人
+    if (ctx.uploaderSchoolId === ctx.operatorSchoolId) return true;
+    if (ctx.studentOwnerSchoolId === ctx.operatorSchoolId) return true;
+    if (ctx.studentSchoolId === ctx.operatorSchoolId) return true;
     if (has(ctx.reviewerSchoolIds, ctx.operatorSchoolId)) return true;
   }
   return false;

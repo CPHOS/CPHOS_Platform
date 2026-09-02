@@ -15,6 +15,8 @@
 - 将旧平台调研报告整理为公开版：脱敏线上地址、管理员用户名与抽样姓名，删除未随仓库公开的探针复跑说明。
 - 更新 `docs/README.md` 当前状态、模块完成度与贡献/安全指引链接。
 - 修正 `docs/02_新系统设计.md` 中与当前实现不一致的状态、对象存储与 Prisma migration 表述。
+- 独立代码质检后的修复：分配池统一按 `School.isIndividual` 排除个人参赛者；仲裁同校冲突覆盖上传者、学生 owner 与学生本人；`addPaperPage` 与整卷 READY 强制校验 `StoredObject`；`OBJECT_STORAGE_DRIVER` 对未实现驱动 fail-fast；整卷/页/图片写操作增加事务锁与复核；对外 DTO 移除 `fileKey` / `pageFileKey`。
+- 测试增强：对象文件写入/哈希/清理、名称漂移个人学校排除、仲裁同校单测与路由级 403、重分原因必填与并发幂等、真实 multipart 答题卡上传与对象读取。
 
 ## [0.1.0] - 2026-09-02
 

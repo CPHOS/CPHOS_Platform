@@ -215,8 +215,8 @@ export async function createAllocation(
         defaultSlot: { in: slots },
         auditStatus: 1,
         user: { status: 'ACTIVE' },
-        // 个人参赛者不参与阅卷分配
-        school: { name: { not: '个人' } },
+        // 个人参赛者不参与阅卷分配（以 isIndividual 权威标记为准，避免校名漂移）
+        school: { isIndividual: false },
       },
       orderBy: { id: 'asc' },
       select: { id: true, defaultSlot: true },
@@ -449,9 +449,8 @@ export async function listMyMarkingTasks(
                 paperPageId: true,
                 partIndex: true,
                 crop: true,
-                fileKey: true,
                 createdAt: true,
-                paperPage: { select: { pageNo: true, fileKey: true } },
+                paperPage: { select: { pageNo: true } },
               },
             },
             paper: {
@@ -489,9 +488,7 @@ export async function listMyMarkingTasks(
       paperPageId: String(image.paperPageId),
       partIndex: image.partIndex,
       crop: (image.crop as { x: number; y: number; width: number; height: number } | null) ?? null,
-      fileKey: image.fileKey,
       pageNo: image.paperPage.pageNo,
-      pageFileKey: image.paperPage.fileKey,
       createdAt: image.createdAt.toISOString(),
     })),
     createdAt: task.createdAt.toISOString(),

@@ -28,6 +28,26 @@ export function computeSha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+/** 流式计算已落盘对象的 SHA-256，避免大文件整块读入内存。 */
+export async function computeFileSha256(storagePath: string): Promise<string> {
+  const absolute = objectAbsolutePath(storagePath);
+  if (!existsSync(absolute) || !statSync(absolute).isFile()) throw Errors.notFound('文件');
+  return new Promise<string>((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = createReadStream(absolute);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/** 返回已落盘文件大小；不存在或不是普通文件时返回 null。 */
+export function getObjectFileSize(storagePath: string): number | null {
+  const absolute = objectAbsolutePath(storagePath);
+  if (!existsSync(absolute) || !statSync(absolute).isFile()) return null;
+  return statSync(absolute).size;
+}
+
 export async function putObjectBytes(
   storagePath: string,
   bytes: Buffer,

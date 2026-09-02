@@ -4,11 +4,13 @@ export const ACCOUNTS = {
   admin: { account: 'e2e_admin', password: 'E2eAdmin123!' },
   member: { account: 'e2e_member', password: 'E2eMember123!' },
   coach: { account: 'e2e.coach@example.com', password: 'E2eCoach123!' },
+  coachPeer: { account: 'e2e.coach.peer@example.com', password: 'E2eCoachPeer123!' },
   coach2: { account: 'e2e.coach2@example.com', password: 'E2eCoach123!' },
   rankCoach: { account: 'e2e.rank.coach@example.com', password: 'E2eRankCoach123!' },
   rankCoach2: { account: 'e2e.rank.coach2@example.com', password: 'E2eRankCoach123!' },
   rankCoach3: { account: 'e2e.rank.coach3@example.com', password: 'E2eRankCoach123!' },
   rankCoach4: { account: 'e2e.rank.coach4@example.com', password: 'E2eRankCoach123!' },
+  specialIndividual: { account: 'e2e.special.individual@example.com', password: 'E2eSpecialIndividual123!' },
   reset: { account: 'e2e.reset@example.com', password: 'E2eReset123!' },
   email: { account: 'e2e.email@example.com', password: 'E2eEmail123!' },
 } as const;

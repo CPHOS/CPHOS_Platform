@@ -37,7 +37,8 @@ interface JwtPayload {
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  const authLimit = { max: 60, timeWindow: '1 minute' };
+  // E2E 本地会高频登录；仅测试环境放宽，生产仍保持 60 次/分钟。
+  const authLimit = { max: env.NODE_ENV === 'test' ? 600 : 60, timeWindow: '1 minute' };
   /** 为某个用户签发访问令牌（带 tokenVersion，改密/禁用后立即失效） */
   const signAccess = (app: FastifyInstance, userId: bigint, email: string | null, tokenVersion: number) =>
     app.jwt.sign({ sub: String(userId), email, tv: tokenVersion });

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
-import { login, PROJECT_ROOT } from './helpers';
+import { login, PROJECT_ROOT, uploadPaperPage } from './helpers';
 
 const SHOT_DIR = path.join(PROJECT_ROOT, 'e2e', 'artifacts');
 
@@ -43,10 +43,7 @@ test('M3-A 排名分段与导出', async ({ page, request }) => {
   const paper = await request
     .post('/api/papers', { headers: coachAuth, data: { examId: exam.id, studentId: student.id } })
     .then((r: any) => r.json());
-  await request.post('/api/papers/' + paper.id + '/pages', {
-    headers: coachAuth,
-    data: { pageNo: 1, fileKey: 'papers/' + paper.id + '/rank.png' },
-  });
+  await uploadPaperPage(request, coachAuth, paper.id, 1);
   const full = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());
   const q1 = full.questions[0];
   await request.post('/api/papers/' + paper.id + '/images', {

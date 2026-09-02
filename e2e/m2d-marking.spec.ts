@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
-import { login, PROJECT_ROOT } from './helpers';
+import { login, PROJECT_ROOT, uploadPaperPage } from './helpers';
 
 const SHOT_DIR = path.join(PROJECT_ROOT, 'e2e', 'artifacts');
 
@@ -42,10 +42,7 @@ test('M2-D 双阅打分、分差仲裁、最终分与 BOT 认证', async ({ page
     .post('/api/papers', { headers: coachAuth, data: { examId: exam.id, studentId: student.id } })
     .then((r: any) => r.json());
   for (const pageNo of [1, 2]) {
-    await request.post('/api/papers/' + paper.id + '/pages', {
-      headers: coachAuth,
-      data: { pageNo, fileKey: 'papers/' + paper.id + '/p' + pageNo + '.png' },
-    });
+    await uploadPaperPage(request, coachAuth, paper.id, pageNo);
   }
   const full = await request.get('/api/papers/' + paper.id, { headers: coachAuth }).then((r: any) => r.json());
   const q1 = full.questions.find((q: any) => q.slot === 1);
@@ -94,6 +91,18 @@ test('M2-D 双阅打分、分差仲裁、最终分与 BOT 认证', async ({ page
     headers: rank3Auth,
     data: { score: 5 },
   });
+
+  // 上传者同校成员不能认领仲裁
+  const arbList = await request
+    .get('/api/arbitration/tasks', { headers: adminAuth, params: { status: 'PENDING', pageSize: 50 } })
+    .then((r: any) => r.json());
+  const arbItem = arbList.items.find((a: any) => a.examId === exam.id);
+  expect(arbItem).toBeTruthy();
+  const sameSchoolToken = await apiLogin(request, ACCOUNTS.coachPeer.account, ACCOUNTS.coachPeer.password);
+  const sameSchoolClaim = await request.post('/api/arbitration/tasks/' + arbItem.id + '/claim', {
+    headers: { Authorization: 'Bearer ' + sameSchoolToken },
+  });
+  expect(sameSchoolClaim.status()).toBe(403);
 
   // CPHOS 仲裁
   await login(page, ACCOUNTS.member.account, ACCOUNTS.member.password);

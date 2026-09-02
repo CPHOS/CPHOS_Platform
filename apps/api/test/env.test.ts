@@ -23,6 +23,12 @@ describe('生产环境密钥 fail-fast', () => {
     expect(env.NODE_ENV).toBe('development');
   });
 
+  it('任何环境都拒绝尚未实现的 s3 对象存储驱动', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('OBJECT_STORAGE_DRIVER', 's3');
+    await expect(loadEnv()).rejects.toThrow(/OBJECT_STORAGE_DRIVER|S3/);
+  });
+
   it('生产环境使用默认 JWT_SECRET 时拒绝启动', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('JWT_SECRET', INSECURE_JWT_DEFAULT);

@@ -61,6 +61,14 @@ const schema = z
     SMTP_FROM: z.string().default(DEV_SMTP_FROM),
   })
   .superRefine((value, ctx) => {
+    if (value.OBJECT_STORAGE_DRIVER !== 'local') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['OBJECT_STORAGE_DRIVER'],
+        message: '当前仅实现本地文件对象存储；S3/MinIO adapter 完成前禁止选择 ' + value.OBJECT_STORAGE_DRIVER,
+      });
+    }
+
     if (value.NODE_ENV !== 'production') return;
 
     const looksPlaceholder = (v: string | undefined) =>

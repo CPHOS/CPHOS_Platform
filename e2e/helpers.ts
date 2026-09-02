@@ -1,6 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
+
+/** 1x1 transparent PNG，用于 API 上传真实答题卡文件。 */
+const TINY_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
+/** 通过真实 multipart 上传页，确保 PaperPage 带 StoredObject 元数据。 */
+export async function uploadPaperPage(
+  request: APIRequestContext,
+  auth: { Authorization: string },
+  paperId: string,
+  pageNo: number,
+): Promise<void> {
+  const res = await request.post(`/api/papers/${paperId}/pages/upload`, {
+    headers: auth,
+    multipart: {
+      pageNo: String(pageNo),
+      file: {
+        name: `page-${pageNo}.png`,
+        mimeType: 'image/png',
+        buffer: TINY_PNG,
+      },
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+}
 
 /** Playwright 从仓库根目录运行（pnpm e2e），直接以 cwd 作为项目根 */
 export const PROJECT_ROOT = process.cwd();

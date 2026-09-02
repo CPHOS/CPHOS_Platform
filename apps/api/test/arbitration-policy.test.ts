@@ -8,8 +8,11 @@ function ctx(overrides: Partial<ArbitrationConflictContext> = {}): ArbitrationCo
     operatorSchoolId: null,
     uploaderUserId: 1n,
     uploaderTeamId: null,
+    uploaderSchoolId: null,
     studentOwnerUserId: 2n,
     studentOwnerTeamId: null,
+    studentOwnerSchoolId: null,
+    studentSchoolId: null,
     reviewerUserIds: [3n, 4n],
     reviewerTeamIds: [null, null],
     reviewerSchoolIds: [null, null],
@@ -33,6 +36,10 @@ describe('arbitration conflict policy', () => {
 
   it('rejects same team or school', () => {
     expect(hasArbitrationConflict(ctx({ operatorTeamId: 7n, uploaderTeamId: 7n }))).toBe(true);
+    expect(hasArbitrationConflict(ctx({ operatorSchoolId: 9n, uploaderSchoolId: 9n }))).toBe(true);
+    expect(hasArbitrationConflict(ctx({ operatorSchoolId: 9n, studentOwnerSchoolId: 9n }))).toBe(true);
+    expect(hasArbitrationConflict(ctx({ operatorSchoolId: 9n, studentSchoolId: 9n }))).toBe(true);
     expect(hasArbitrationConflict(ctx({ operatorSchoolId: 9n, reviewerSchoolIds: [9n, null] }))).toBe(true);
+    expect(hasArbitrationConflict(ctx({ operatorSchoolId: 9n, uploaderSchoolId: 8n, studentSchoolId: 7n }))).toBe(false);
   });
 });

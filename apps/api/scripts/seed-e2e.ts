@@ -10,11 +10,13 @@ export const E2E_ACCOUNTS = {
   admin: { loginName: 'e2e_admin', displayName: 'E2E 管理员', password: 'E2eAdmin123!' },
   member: { loginName: 'e2e_member', displayName: 'E2E 内部成员', password: 'E2eMember123!' },
   coach: { email: 'e2e.coach@example.com', displayName: 'E2E 教练甲', password: 'E2eCoach123!' },
+  coachPeer: { email: 'e2e.coach.peer@example.com', displayName: 'E2E 同校非阅卷人', password: 'E2eCoachPeer123!' },
   coach2: { email: 'e2e.coach2@example.com', displayName: 'E2E 教练乙', password: 'E2eCoach123!' },
   rankCoach: { email: 'e2e.rank.coach@example.com', displayName: 'E2E 排名教练', password: 'E2eRankCoach123!' },
   rankCoach2: { email: 'e2e.rank.coach2@example.com', displayName: 'E2E 排名教练乙', password: 'E2eRankCoach123!' },
   rankCoach3: { email: 'e2e.rank.coach3@example.com', displayName: 'E2E 排名教练丙', password: 'E2eRankCoach123!' },
   rankCoach4: { email: 'e2e.rank.coach4@example.com', displayName: 'E2E 排名教练丁', password: 'E2eRankCoach123!' },
+  specialIndividual: { email: 'e2e.special.individual@example.com', displayName: 'E2E 特殊个人通道', password: 'E2eSpecialIndividual123!' },
   reset: { email: 'e2e.reset@example.com', displayName: 'E2E 重置用户', password: 'E2eReset123!' },
   email: { email: 'e2e.email@example.com', displayName: 'E2E 换绑用户', password: 'E2eEmail123!' },
 } as const;
@@ -42,6 +44,12 @@ async function main() {
   const personalSchool = await prisma.school.upsert({
     where: { name_areaId: { name: '个人', areaId: area.id } },
     create: { name: '个人', areaId: area.id, isIndividual: true },
+    update: { isIndividual: true },
+  });
+  // 用于回归：校名不是“个人”但 isIndividual=true 的成员也必须排除在分配池外。
+  const specialIndividualSchool = await prisma.school.upsert({
+    where: { name_areaId: { name: 'E2E特殊个人通道', areaId: area.id } },
+    create: { name: 'E2E特殊个人通道', areaId: area.id, isIndividual: true },
     update: { isIndividual: true },
   });
 
@@ -97,6 +105,27 @@ async function main() {
       auditStatus: 1,
     },
   });
+  const specialIndividual = await prisma.userAccount.create({
+    data: {
+      email: E2E_ACCOUNTS.specialIndividual.email,
+      displayName: E2E_ACCOUNTS.specialIndividual.displayName,
+      emailVerifiedAt: new Date(),
+      passwordHash: await hashPassword(E2E_ACCOUNTS.specialIndividual.password),
+      role: 'PLATFORM_USER',
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.memberProfile.create({
+    data: {
+      userId: specialIndividual.id,
+      realName: '特殊个人通道',
+      schoolId: specialIndividualSchool.id,
+      role: 'LEADER',
+      defaultSlot: 1,
+      uploadLimit: 100,
+      auditStatus: 1,
+    },
+  });
 
   // 平台用户：带成员资料，供团队管理选择
   const coach = await prisma.userAccount.create({
@@ -116,6 +145,28 @@ async function main() {
       schoolId: school.id,
       role: 'LEADER',
       // M3 排名/成绩专用 rankCoach 占用槽位1；普通教练默认不参与自动分配
+      defaultSlot: 9,
+      uploadLimit: 100,
+      auditStatus: 1,
+    },
+  });
+
+  const coachPeer = await prisma.userAccount.create({
+    data: {
+      email: E2E_ACCOUNTS.coachPeer.email,
+      displayName: E2E_ACCOUNTS.coachPeer.displayName,
+      emailVerifiedAt: new Date(),
+      passwordHash: await hashPassword(E2E_ACCOUNTS.coachPeer.password),
+      role: 'PLATFORM_USER',
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.memberProfile.create({
+    data: {
+      userId: coachPeer.id,
+      realName: '同校非阅卷人',
+      schoolId: school.id,
+      role: 'LEADER',
       defaultSlot: 9,
       uploadLimit: 100,
       auditStatus: 1,

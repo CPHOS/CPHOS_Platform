@@ -306,7 +306,6 @@ export interface CropDto {
 export interface PaperPageDto {
   id: string;
   pageNo: number;
-  fileKey: string;
   mimeType: string | null;
   sizeBytes: number | null;
   createdAt: string;
@@ -318,9 +317,7 @@ export interface QuestionImageDto {
   paperPageId: string;
   partIndex: number;
   crop: CropDto | null;
-  fileKey: string | null;
   pageNo: number;
-  pageFileKey: string;
   createdAt: string;
 }
 

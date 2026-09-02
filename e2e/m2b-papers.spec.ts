@@ -71,9 +71,9 @@ test('M2-B 整卷：一题多页、多题一页与操作截图', async ({ page, 
 
   // 上传两页，显示分割线
   await page.getByTestId('paper-page-file').setInputFiles({ name: 'p1.png', mimeType: 'image/png', buffer: png });
-  await expect(page.getByText('第 1 页')).toBeVisible();
+  await expect(page.getByText('第 1 页', { exact: true })).toBeVisible();
   await page.getByTestId('paper-page-file').setInputFiles({ name: 'p2.png', mimeType: 'image/png', buffer: png });
-  await expect(page.getByText('第 2 页')).toBeVisible();
+  await expect(page.getByText('第 2 页', { exact: true })).toBeVisible();
   await page.getByTestId('guide-rows').first().fill('3');
   await shot(page, 'paper-upload-guides.png');
 

@@ -19,7 +19,9 @@ import { prisma } from '../../db.js';
 import { env } from '../../env.js';
 import { Errors } from '../../lib/errors.js';
 import {
+  computeFileSha256,
   createStoredObject,
+  getObjectFileSize,
   openObjectStream,
   putObjectBytes,
   removeObjectFile,
@@ -72,9 +74,7 @@ function toImageDto(
     paperPageId: String(image.paperPageId),
     partIndex: image.partIndex,
     crop: (image.crop as QuestionImageDto['crop']) ?? null,
-    fileKey: image.fileKey,
     pageNo: page?.pageNo ?? 0,
-    pageFileKey: page?.fileKey ?? '',
     createdAt: image.createdAt.toISOString(),
   };
 }
@@ -110,7 +110,6 @@ function toPageDto(page: PaperWithRelations['pages'][number]): PaperPageDto {
   return {
     id: String(page.id),
     pageNo: page.pageNo,
-    fileKey: page.fileKey,
     mimeType: page.mimeType,
     sizeBytes: page.sizeBytes,
     createdAt: page.createdAt.toISOString(),
@@ -342,6 +341,48 @@ function assertPaperEditable(paper: PaperWithRelations): void {
   }
 }
 
+/** 在事务内按考试 advisory lock 串行化，并重读整卷做所有权/可编辑性复核。 */
+async function findOwnPaperForUpdate(
+  tx: Prisma.TransactionClient,
+  paperId: bigint,
+  profileId: bigint,
+  examId: bigint,
+): Promise<PaperWithRelations> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${examId})`;
+  const paper = await tx.paper.findUnique({ where: { id: paperId }, include: PAPER_INCLUDE });
+  if (!paper || paper.uploadedById !== profileId) throw Errors.notFound('整卷');
+  assertPaperEditable(paper);
+  return paper;
+}
+
+/** 绑定已存在 StoredObject；若旧数据只有物理文件则补写对象元数据。 */
+async function resolvePaperPageObject(
+  tx: Prisma.TransactionClient,
+  fileKey: string,
+  mimeType: string | null | undefined,
+): Promise<{ id: string; sizeBytes: number; mimeType: string | null }> {
+  const existing = await tx.storedObject.findUnique({
+    where: { storagePath: fileKey },
+    select: { id: true, sizeBytes: true, mimeType: true },
+  });
+  if (existing) return existing;
+  const sizeBytes = getObjectFileSize(fileKey);
+  if (sizeBytes === null) {
+    throw Errors.validation('答题卡文件尚未上传，不能直接登记文件元数据');
+  }
+  const contentHash = await computeFileSha256(fileKey);
+  return tx.storedObject.create({
+    data: {
+      fileName: fileKey.split('/').pop() ?? 'blob.bin',
+      mimeType: mimeType ?? null,
+      sizeBytes,
+      contentHash,
+      storagePath: fileKey,
+    },
+    select: { id: true, sizeBytes: true, mimeType: true },
+  });
+}
+
 export async function addPaperPage(
   userId: bigint,
   paperId: bigint,
@@ -357,16 +398,20 @@ export async function addPaperPage(
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      const fresh = await findOwnPaperForUpdate(tx, paperId, profileId, paper.examId);
+      if (input.pageNo > env.PAPER_MAX_PAGES) throw Errors.validation('超过单卷页数上限');
+      const object = await resolvePaperPageObject(tx, input.fileKey, input.mimeType);
       await tx.paperPage.create({
         data: {
           paperId,
           pageNo: input.pageNo,
           fileKey: input.fileKey,
-          mimeType: input.mimeType ?? null,
-          sizeBytes: input.sizeBytes ?? null,
+          objectId: object.id,
+          mimeType: object.mimeType ?? input.mimeType ?? null,
+          sizeBytes: object.sizeBytes,
         },
       });
-      await writeAudit(tx, userId, 'PAPER_PAGE_ADD', paper, '添加答题卡页 ' + input.pageNo);
+      await writeAudit(tx, userId, 'PAPER_PAGE_ADD', fresh, '添加答题卡页 ' + input.pageNo);
       return tx.paper.findUniqueOrThrow({ where: { id: paperId }, include: PAPER_INCLUDE });
     });
     return toPaperDto(updated);
@@ -396,10 +441,23 @@ export async function bindQuestionImage(
   if (input.fileKey && !input.fileKey.startsWith('papers/' + String(paperId) + '/')) {
     throw Errors.validation('文件键必须属于当前整卷');
   }
-  // 未显式提供时，逐图 fileKey 继承所属页文件，保证 DTO 始终可定位
-  const resolvedFileKey = input.fileKey ?? page.fileKey;
 
   const updated = await prisma.$transaction(async (tx) => {
+    const fresh = await findOwnPaperForUpdate(tx, paperId, profileId, paper.examId);
+    const freshQuestion = fresh.questions.find((q) => q.id === questionId);
+    if (!freshQuestion) throw Errors.notFound('题目');
+    const freshPage = fresh.pages.find((p) => p.id === pageId);
+    if (!freshPage) throw Errors.notFound('答题卡页');
+    // 未显式提供时，逐图 fileKey 继承所属页文件；显式提供时必须指向本卷已登记/已落盘的页文件
+    let resolvedFileKey = freshPage.fileKey;
+    if (input.fileKey) {
+      const sourcePage = fresh.pages.find((p) => p.fileKey === input.fileKey);
+      if (!sourcePage) throw Errors.validation('文件键必须对应当前整卷的答题卡页');
+      if (!sourcePage.objectId && getObjectFileSize(input.fileKey) === null) {
+        throw Errors.validation('答题卡文件尚未上传，不能绑定');
+      }
+      resolvedFileKey = input.fileKey;
+    }
     await tx.questionImage.upsert({
       where: {
         paperQuestionId_paperPageId_partIndex: {
@@ -420,7 +478,7 @@ export async function bindQuestionImage(
         fileKey: resolvedFileKey,
       },
     });
-    await writeAudit(tx, userId, 'PAPER_QUESTION_BIND', paper, '绑定题目槽位 ' + question.slot);
+    await writeAudit(tx, userId, 'PAPER_QUESTION_BIND', fresh, '绑定题目槽位 ' + freshQuestion.slot);
     return tx.paper.findUniqueOrThrow({ where: { id: paperId }, include: PAPER_INCLUDE });
   });
   return toPaperDto(updated);
@@ -440,6 +498,9 @@ export async function removeQuestionImage(
   if (!paper.questions.some((q) => q.id === questionId)) throw Errors.notFound('题目');
   if (!paper.pages.some((p) => p.id === pageId)) throw Errors.notFound('答题卡页');
   await prisma.$transaction(async (tx) => {
+    const fresh = await findOwnPaperForUpdate(tx, paperId, profileId, paper.examId);
+    if (!fresh.questions.some((q) => q.id === questionId)) throw Errors.notFound('题目');
+    if (!fresh.pages.some((p) => p.id === pageId)) throw Errors.notFound('答题卡页');
     const removed = await tx.questionImage.deleteMany({
       where: {
         paperQuestionId: questionId,
@@ -448,7 +509,7 @@ export async function removeQuestionImage(
       },
     });
     if (removed.count === 0) throw Errors.notFound('图片绑定');
-    await writeAudit(tx, userId, 'PAPER_QUESTION_BIND', paper, '移除题目槽位 ' + questionId + ' 的图片绑定');
+    await writeAudit(tx, userId, 'PAPER_QUESTION_BIND', fresh, '移除题目槽位 ' + questionId + ' 的图片绑定');
   });
   const updated = await findOwnPaperOrThrow(paperId, profileId);
   return toPaperDto(updated);
@@ -467,41 +528,53 @@ export async function setPaperStatus(
   if (paper.finalizedAt && input.status !== 'ARCHIVED') {
     throw Errors.validation('成绩已定稿，仅可随考试归档');
   }
-
-  if (input.status === 'READY') {
-    const missing = paper.questions.filter((q) => q.images.length === 0);
-    if (missing.length > 0) {
-      throw Errors.validation('仍有题目未绑定图片，不能标记就绪');
-    }
-  }
-  if (input.status === 'ARCHIVED') {
-    const activeTasks = await prisma.markingTask.count({
-      where: {
-        paperQuestion: { paperId },
-        status: 'PENDING',
-        allocation: { status: 'ACTIVE' },
-      },
-    });
-    const activeArbitrations = await prisma.arbitration.count({
-      where: {
-        status: { in: ['PENDING', 'CLAIMED'] },
-        paperQuestion: { paperId },
-      },
-    });
-    if (activeTasks > 0 || activeArbitrations > 0) {
-      throw Errors.validation('该卷仍有未完成阅卷/仲裁任务，不能归档');
-    }
+  if (input.status === 'READY' && paper.questions.some((q) => q.images.length === 0)) {
+    throw Errors.validation('仍有题目未绑定图片，不能标记就绪');
   }
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${paper.examId})`;
+    const fresh = await tx.paper.findUnique({ where: { id: paperId }, include: PAPER_INCLUDE });
+    if (!fresh || fresh.uploadedById !== profileId) throw Errors.notFound('整卷');
+    if (fresh.status === 'ARCHIVED' && input.status !== 'ARCHIVED') {
+      throw Errors.validation('已归档整卷不可恢复');
+    }
+    if (fresh.finalizedAt && input.status !== 'ARCHIVED') {
+      throw Errors.validation('成绩已定稿，仅可随考试归档');
+    }
     if (input.status === 'READY') {
       const activeAllocation = await tx.allocationBatch.findFirst({
-        where: { examId: paper.examId, status: 'ACTIVE' },
+        where: { examId: fresh.examId, status: 'ACTIVE' },
         select: { id: true },
       });
       if (activeAllocation) {
         throw Errors.validation('本场考试已生成分配，不能追加标记就绪；请先撤销分配后重试');
+      }
+      // 就绪前必须确认每张引用页都已绑定 StoredObject；旧数据请先跑 object:backfill
+      const pageHasObject = new Map(fresh.pages.map((p) => [String(p.id), Boolean(p.objectId)]));
+      const missing = fresh.questions.filter(
+        (q) => q.images.length === 0 || q.images.some((img) => !pageHasObject.get(String(img.paperPageId))),
+      );
+      if (missing.length > 0) {
+        throw Errors.validation('仍有题目图片未关联对象存储，不能标记就绪');
+      }
+    }
+    if (input.status === 'ARCHIVED') {
+      const activeTasks = await tx.markingTask.count({
+        where: {
+          paperQuestion: { paperId },
+          status: 'PENDING',
+          allocation: { status: 'ACTIVE' },
+        },
+      });
+      const activeArbitrations = await tx.arbitration.count({
+        where: {
+          status: { in: ['PENDING', 'CLAIMED'] },
+          paperQuestion: { paperId },
+        },
+      });
+      if (activeTasks > 0 || activeArbitrations > 0) {
+        throw Errors.validation('该卷仍有未完成阅卷/仲裁任务，不能归档');
       }
     }
     const changed = await tx.paper.updateMany({
@@ -513,7 +586,7 @@ export async function setPaperStatus(
       tx,
       userId,
       input.status === 'READY' ? 'PAPER_READY' : 'PAPER_ARCHIVE',
-      paper,
+      fresh,
       input.status === 'READY' ? '整卷标记就绪' : '归档整卷',
     );
     return tx.paper.findUniqueOrThrow({ where: { id: paperId }, include: PAPER_INCLUDE });
@@ -697,6 +770,8 @@ export async function uploadPaperPage(
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      const fresh = await findOwnPaperForUpdate(tx, paperId, profileId, paper.examId);
+      if (fresh.pages.length >= env.PAPER_MAX_PAGES) throw Errors.validation('超过单卷页数上限');
       const object = await createStoredObject(tx, {
         fileName: input.originalName,
         mimeType: input.mimeType,
@@ -714,7 +789,7 @@ export async function uploadPaperPage(
           sizeBytes: stored.sizeBytes,
         },
       });
-      await writeAudit(tx, userId, 'PAPER_PAGE_ADD', paper, '上传答题卡页 ' + input.pageNo);
+      await writeAudit(tx, userId, 'PAPER_PAGE_ADD', fresh, '上传答题卡页 ' + input.pageNo);
       return tx.paper.findUniqueOrThrow({ where: { id: paperId }, include: PAPER_INCLUDE });
     });
     return toPaperDto(updated);
