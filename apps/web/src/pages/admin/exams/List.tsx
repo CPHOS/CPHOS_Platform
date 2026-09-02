@@ -25,6 +25,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { adminAllocationApi } from '../../../api/allocation';
+import { QueryError } from '../../../components/QueryError';
 import { adminExamsApi } from '../../../api/exams';
 import { rankingApi } from '../../../api/ranking';
 import { apiErrorMessage } from '../../../api/http';
@@ -69,21 +70,36 @@ export function ExamsAdminPage() {
   const [rankingExam, setRankingExam] = useState<ExamDto | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'exams', status, q, page, pageSize],
     queryFn: () => adminExamsApi.list({ status, q: q || undefined, page, pageSize }),
   });
-  const { data: allocPreview, refetch: refetchPreview } = useQuery({
+  const {
+    data: allocPreview,
+    isError: allocPreviewError,
+    error: allocPreviewErr,
+    refetch: refetchPreview,
+  } = useQuery({
     queryKey: ['admin', 'allocation', 'preview', allocating?.id],
     queryFn: () => adminAllocationApi.preview(allocating!.id),
     enabled: !!allocating,
   });
-  const { data: allocBatches, refetch: refetchBatches } = useQuery({
+  const {
+    data: allocBatches,
+    isError: allocBatchesError,
+    error: allocBatchesErr,
+    refetch: refetchBatches,
+  } = useQuery({
     queryKey: ['admin', 'allocation', 'batches', allocating?.id],
     queryFn: () => adminAllocationApi.batches(allocating!.id),
     enabled: !!allocating,
   });
-  const { data: ranking } = useQuery({
+  const {
+    data: ranking,
+    isError: rankingError,
+    error: rankingErr,
+    refetch: refetchRanking,
+  } = useQuery({
     queryKey: ['admin', 'ranking', rankingExam?.id],
     queryFn: () => rankingApi.get(rankingExam!.id),
     enabled: !!rankingExam,
@@ -349,6 +365,7 @@ export function ExamsAdminPage() {
         </Button>
       </div>
 
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<ExamDto>
         rowKey="id"
         loading={isLoading}
@@ -477,6 +494,12 @@ export function ExamsAdminPage() {
           </Button>
         }
       >
+        {allocPreviewError && (
+          <QueryError error={allocPreviewErr} onRetry={() => void refetchPreview()} title="分配预览加载失败" />
+        )}
+        {allocBatchesError && (
+          <QueryError error={allocBatchesErr} onRetry={() => void refetchBatches()} title="分配历史加载失败" />
+        )}
         {allocPreview && (
           <Card size="small" title="均衡预览" style={{ marginBottom: 16 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
@@ -558,6 +581,9 @@ export function ExamsAdminPage() {
           </Space>
         }
       >
+        {rankingError && (
+          <QueryError error={rankingErr} onRetry={() => void refetchRanking()} title="成绩排名加载失败" />
+        )}
         {ranking && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <span>

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { tasksApi } from '../../api/allocation';
 import { apiErrorMessage } from '../../api/http';
 import { markingApi } from '../../api/marking';
+import { QueryError } from '../../components/QueryError';
 import { AnswerImage } from '../../components/AnswerImage';
 
 const STATUS_COLORS: Record<MarkingTaskStatus, string> = {
@@ -30,7 +31,7 @@ export function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<GradeForm>();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tasks', 'mine', status, page, pageSize],
     queryFn: () => tasksApi.listMine({ status, page, pageSize }),
   });
@@ -102,6 +103,7 @@ export function TasksPage() {
         />
         <span style={{ color: '#888' }}>评阅分差超过考试配置 gap 时将自动生成仲裁任务。</span>
       </Space>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<MarkingTaskDto>
         rowKey="id"
         loading={isLoading}

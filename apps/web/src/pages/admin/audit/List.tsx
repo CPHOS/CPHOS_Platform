@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAuditApi } from '../../../api/admin';
+import { QueryError } from '../../../components/QueryError';
 import type { AuditApplicationDto } from '@cphos/shared';
 
 const STATUS_COLORS: Record<AuditStatus, string> = {
@@ -21,7 +22,7 @@ export function AuditList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'audit', 'applications', status, q, page, pageSize],
     queryFn: () => adminAuditApi.list({ status, q: q || undefined, page, pageSize }),
   });
@@ -84,6 +85,7 @@ export function AuditList() {
           }}
         />
       </Space>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<AuditApplicationDto>
         rowKey="id"
         loading={isLoading}

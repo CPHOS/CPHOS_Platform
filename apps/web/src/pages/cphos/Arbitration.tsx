@@ -11,6 +11,7 @@ import { arbitrationApi } from '../../api/marking';
 import { apiErrorMessage } from '../../api/http';
 import { AnswerImage } from '../../components/AnswerImage';
 import { useAuthStore } from '../../stores/auth';
+import { QueryError } from '../../components/QueryError';
 
 const STATUS_COLORS: Record<ArbitrationStatus, string> = {
   PENDING: 'processing',
@@ -35,7 +36,7 @@ export function ArbitrationPage() {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<GradeForm>();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['arbitration', status, page, pageSize],
     queryFn: () => arbitrationApi.list({ status, page, pageSize }),
   });
@@ -129,6 +130,7 @@ export function ArbitrationPage() {
         />
         <span style={{ color: '#888' }}>CPHOS 成员/管理员/BOT 可认领；完成仲裁后写入最终题分并汇总总分。</span>
       </Space>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<ArbitrationDto>
         rowKey="id"
         loading={isLoading}

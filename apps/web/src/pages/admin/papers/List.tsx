@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { adminPapersApi } from '../../../api/adminPapers';
 import { apiErrorMessage } from '../../../api/http';
 import { useAuthStore } from '../../../stores/auth';
+import { QueryError } from '../../../components/QueryError';
 
 /** 管理员：整卷查询与逐卷评阅次数调整 */
 export function AdminPapersPage() {
@@ -19,7 +20,7 @@ export function AdminPapersPage() {
   const [reviewCount, setReviewCount] = useState<number | null>(2);
   const [saving, setSaving] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'papers', q, page, pageSize],
     queryFn: () => adminPapersApi.list({ q: q || undefined, page, pageSize }),
   });
@@ -88,6 +89,7 @@ export function AdminPapersPage() {
           普通管理员最低 2 次；{me?.role === 'SUPER_ADMIN' ? '超级管理员可设为 1 次单评。' : '超级管理员可设置低于最低限的数值。'}
         </Typography.Text>
       </Space>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<PaperDto>
         rowKey="id"
         loading={isLoading}

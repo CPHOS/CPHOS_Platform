@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiErrorMessage } from '../../api/http';
 import { paperApi } from '../../api/papers';
 import { studentApi } from '../../api/students';
+import { QueryError } from '../../components/QueryError';
 
 function GuidedImage({ paperId, page }: { paperId: string; page: PaperPageDto }) {
   const [url, setUrl] = useState('');
@@ -119,7 +120,7 @@ export function PapersPage() {
   }>();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['papers', 'mine', page, pageSize],
     queryFn: () => paperApi.listMine({ page, pageSize }),
   });
@@ -265,6 +266,7 @@ export function PapersPage() {
           新建整卷
         </Button>
       </div>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<PaperDto>
         rowKey="id"
         loading={isLoading}

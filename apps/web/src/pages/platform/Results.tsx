@@ -11,6 +11,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { paperApi } from '../../api/papers';
 import { resultApi } from '../../api/results';
+import { QueryError } from '../../components/QueryError';
 
 function ResultImage({ paperId, image }: { paperId: string; image: QuestionImageDto }) {
   const [url, setUrl] = useState('');
@@ -58,7 +59,7 @@ function ResultImage({ paperId, image }: { paperId: string; image: QuestionImage
 export function ResultsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const { data: ranking, isLoading } = useQuery({
+  const { data: ranking, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['results', 'my-ranking'],
     queryFn: resultApi.myRanking,
   });
@@ -96,6 +97,7 @@ export function ResultsPage() {
       <Typography.Paragraph type="secondary">
         仅展示所有题目均已定稿并汇总总分的整卷；可回看各评阅分、仲裁结果与题目组图。
       </Typography.Paragraph>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<MyRankingEntryDto>
         rowKey="paperId"
         loading={isLoading}

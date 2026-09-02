@@ -23,6 +23,7 @@ import { useState } from 'react';
 import { dictApi } from '../../../api/dict';
 import { apiErrorMessage } from '../../../api/http';
 import { adminMembersApi } from '../../../api/members';
+import { QueryError } from '../../../components/QueryError';
 
 interface EditForm {
   realName: string;
@@ -44,7 +45,7 @@ export function MembersList() {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<EditForm>();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'members', role, q, page, pageSize],
     queryFn: () => adminMembersApi.list({ role, q: q || undefined, page, pageSize }),
   });
@@ -124,6 +125,7 @@ export function MembersList() {
           }}
         />
       </Space>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<MemberDto>
         rowKey="userId"
         loading={isLoading}

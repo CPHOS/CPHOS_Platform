@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { dictApi } from '../../api/dict';
 import { apiErrorMessage } from '../../api/http';
 import { studentApi } from '../../api/students';
+import { QueryError } from '../../components/QueryError';
 import { useAuthStore } from '../../stores/auth';
 
 interface StudentForm {
@@ -42,7 +43,7 @@ export function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<StudentForm>();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['students', 'mine', q, schoolId, gradeId, prizeId, page, pageSize],
     queryFn: () =>
       studentApi.listMine({
@@ -193,6 +194,7 @@ export function StudentsPage() {
         </Button>
       </div>
 
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<StudentDto>
         rowKey="id"
         loading={isLoading}

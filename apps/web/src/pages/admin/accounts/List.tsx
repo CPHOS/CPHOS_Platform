@@ -25,6 +25,7 @@ import { useState } from 'react';
 import { apiErrorMessage } from '../../../api/http';
 import { botApi } from '../../../api/marking';
 import { adminAccountsApi } from '../../../api/members';
+import { QueryError } from '../../../components/QueryError';
 import { useAuthStore } from '../../../stores/auth';
 
 interface CreateForm {
@@ -72,7 +73,7 @@ export function AccountsList() {
   const [botToken, setBotToken] = useState<{ loginName: string; token: string } | null>(null);
   const [botForm] = Form.useForm<BotForm>();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'accounts', role, status, q, page, pageSize],
     queryFn: () => adminAccountsApi.list({ role, status, q: q || undefined, page, pageSize }),
   });
@@ -240,6 +241,7 @@ export function AccountsList() {
           </Button>
         </Space>
       </div>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<AccountDto>
         rowKey="id"
         loading={isLoading}

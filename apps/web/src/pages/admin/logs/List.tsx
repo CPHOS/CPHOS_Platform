@@ -9,6 +9,7 @@ import { Card, Input, Select, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { adminAuditApi } from '../../../api/admin';
+import { QueryError } from '../../../components/QueryError';
 
 const ACTION_COLORS: Record<string, string> = {
   APPROVE: 'success',
@@ -35,7 +36,7 @@ export function AuditLogsList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'audit', 'logs', action, q, page, pageSize],
     queryFn: () => adminAuditApi.logs({ action, q: q || undefined, page, pageSize }),
   });
@@ -97,6 +98,7 @@ export function AuditLogsList() {
           }}
         />
       </Space>
+      {isError && <QueryError error={error} onRetry={() => void refetch()} />}
       <Table<AuditLogDto>
         rowKey="id"
         loading={isLoading}
