@@ -1,0 +1,97 @@
+name: 🐛 Bug 反馈
+description: 报告一个可复现的问题，帮助我们定位并修复
+title: "[Bug]: "
+labels:
+  - bug
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你花时间填写 Bug 报告。提交前请先搜索是否已有相同 Issue。
+
+        如果问题涉及安全漏洞，请勿在此提交，改用 [SECURITY.md](../../SECURITY.md) 中的私有渠道。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经搜索过现有 Issue，没有找到重复内容
+          required: true
+        - label: 我看过 README 的快速开始与环境要求，并确认本地依赖版本符合要求
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 简洁说明发生了什么，以及你原本期望发生什么
+      placeholder: 例如：管理员重分提交后，页面提示成功但任务列表没有刷新
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 请尽量给出稳定复现的最少步骤
+      placeholder: |
+        1. 启动 ...
+        2. 使用角色 ... 登录
+        3. 进入 ... 页面
+        4. 点击 ...
+        5. 看到错误 ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      placeholder: 描述正确的结果或交互
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图 / 日志
+      description: 如有帮助请附上截图、API 响应或浏览器控制台日志；请先隐去个人敏感信息
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / commit
+      placeholder: 例如 main@27cb5f9 或 v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 受影响模块
+      multiple: true
+      options:
+        - apps/api
+        - apps/web
+        - packages/shared
+        - e2e
+        - 文档 / 部署配置
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 填写操作系统、Node、pnpm、浏览器等信息
+      value: |
+        - OS:
+        - Node:
+        - pnpm:
+        - Browser:
+    validations:
+      required: false
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 其他可能相关的背景、尝试过的修复或临时绕过方法
+    validations:
+      required: false

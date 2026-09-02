@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "CPHOS 联考新平台：TypeScript 全栈（Fastify + Prisma + React + Ant Design），三端界面",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CPHOS/CPHOS_Platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CPHOS/CPHOS_Platform/issues"
+  },
+  "homepage": "https://github.com/CPHOS/CPHOS_Platform#readme",
   "engines": {
     "node": ">=20"
   },

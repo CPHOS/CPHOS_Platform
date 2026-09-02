@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 安全漏洞私有报告
+    url: https://github.com/CPHOS/CPHOS_Platform/security/advisories/new
+    about: 请勿在公开 Issue 中披露安全漏洞，使用 GitHub Security Advisories 私下报告
+  - name: 📚 项目文档
+    url: https://github.com/CPHOS/CPHOS_Platform/tree/main/docs
+    about: 先查看旧系统调研、新系统设计与文档索引
