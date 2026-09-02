@@ -3,12 +3,14 @@ import {
   createAllocationSchema,
   idSchema,
   listAllocationBatchesQuerySchema,
+  regradeAllocationSchema,
 } from '@cphos/shared';
 import {
   createAllocation,
   getBatch,
   listAllocationBatches,
   previewAllocation,
+  regradeBatch,
   revokeBatch,
 } from './allocation.service.js';
 
@@ -47,5 +49,11 @@ export async function adminAllocationRoutes(app: FastifyInstance): Promise<void>
   app.post('/allocation/batches/:id/revoke', { onRequest: guard }, async (req) => {
     const { id } = req.params as { id: string };
     return revokeBatch(BigInt(idSchema.parse(id)), BigInt(req.user.sub));
+  });
+
+  app.post('/allocation/batches/:id/regrade', { onRequest: guard }, async (req) => {
+    const { id } = req.params as { id: string };
+    const input = regradeAllocationSchema.parse(req.body);
+    return regradeBatch(BigInt(idSchema.parse(id)), BigInt(req.user.sub), input);
   });
 }

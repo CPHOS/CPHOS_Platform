@@ -71,6 +71,7 @@ enum AuditAction {
   PAPER_REVIEW_COUNT // 调整整卷评阅次数
   ALLOCATION_CREATE // 创建分配批次
   ALLOCATION_REVOKE // 撤销分配批次
+  ALLOCATION_REGRADE // 已定稿重分/重开
   BOT_CREATE // 创建机器人账号
   BOT_TOKEN_ROTATE // 轮换机器人令牌
   MARK_TASK_GRADE // 阅卷打分

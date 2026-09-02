@@ -42,7 +42,8 @@ async function setupThreeReviewExam(request: any, adminAuth: any, suffix: string
     data: {},
   });
   expect(allocation.ok()).toBeTruthy();
-  return { exam, paper, question: full.questions[0] };
+  const batch = await allocation.json();
+  return { exam, paper, question: full.questions[0], batch };
 }
 
 async function tasksFor(request: any, account: { account: string; password: string }, examId: string) {
@@ -94,6 +95,25 @@ test('M2-E N=3 不同阅卷人：均值舍入与超分差仲裁', async ({ reque
   });
   expect(ownerMean.ok()).toBeTruthy();
   expect((await ownerMean.json()).questions[0].finalScore).toBe(8.34);
+
+  // 已定稿批次可审计重分/重开，清空当前成绩并允许再次分配
+  const regrade = await request.post('/api/admin/allocation/batches/' + meanExam.batch.id + '/regrade', {
+    headers: adminAuth,
+    data: { reason: 'E2E 验证已定稿重分流程' },
+  });
+  expect(regrade.ok()).toBeTruthy();
+  const reopened = await request.get('/api/papers/' + meanExam.paper.id, {
+    headers: { Authorization: 'Bearer ' + ownerToken },
+  });
+  const reopenedBody = await reopened.json();
+  expect(reopenedBody.finalizedAt).toBeNull();
+  expect(reopenedBody.score).toBeNull();
+  expect(reopenedBody.questions[0].finalScore).toBeNull();
+  const reallocate = await request.post('/api/admin/exams/' + meanExam.exam.id + '/allocation', {
+    headers: adminAuth,
+    data: { note: '重开后再次分配' },
+  });
+  expect(reallocate.ok()).toBeTruthy();
 
   // B. N=3 超分差触发仲裁：8/10/12 -> 仲裁 7
   const gapExam = await setupThreeReviewExam(request, adminAuth, suffix, 1);

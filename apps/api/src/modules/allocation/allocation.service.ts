@@ -5,6 +5,7 @@ import type {
   AllocationPreviewDto,
   CreateAllocationInput,
   ListAllocationBatchesQuery,
+  RegradeAllocationInput,
   ListMarkingTasksQuery,
   MarkingTaskDto,
   MarkingTaskListDto,
@@ -315,74 +316,96 @@ export async function getBatch(id: bigint): Promise<AllocationBatchDto> {
   return toBatchDto(await findBatchOrThrow(id));
 }
 
-export async function revokeBatch(id: bigint, operatorId: bigint): Promise<AllocationBatchDto> {
-  const batch = await findBatchOrThrow(id);
-  if (batch.status !== 'ACTIVE') throw Errors.validation('该批次不是生效中状态');
-  const updated = await prisma.$transaction(async (tx) => {
-    const changed = await tx.allocationBatch.updateMany({
-      where: { id, status: 'ACTIVE' },
-      data: { status: 'REVOKED', revokedAt: new Date() },
-    });
-    if (changed.count !== 1) throw Errors.validation('该批次已撤销');
-    const affected = await tx.markingTask.findMany({
-      where: { allocationId: id },
-      select: {
-        paperQuestionId: true,
-        paperQuestion: { select: { paperId: true } },
-      },
-    });
-    const questionIds = [...new Set(affected.map((a) => a.paperQuestionId))];
-    const paperIds = [...new Set(affected.map((a) => a.paperQuestion.paperId))].sort((a, b) =>
-      a < b ? -1 : 1,
-    );
-    // 与阅卷/仲裁终审保持一致的 Paper 行锁，防止检查后被并发定稿
-    for (const paperId of paperIds) {
-      await tx.$executeRaw`SELECT id FROM "Paper" WHERE "id" = ${paperId} FOR UPDATE`;
-    }
+async function closeBatchInternal(
+  tx: Prisma.TransactionClient,
+  batch: { id: bigint; examId: bigint },
+  operatorId: bigint,
+  action: 'ALLOCATION_REVOKE' | 'ALLOCATION_REGRADE',
+  allowFinalized: boolean,
+  remark: string,
+): Promise<BatchWithRelations> {
+  const id = batch.id;
+  const changed = await tx.allocationBatch.updateMany({
+    where: { id, status: 'ACTIVE' },
+    data: { status: 'REVOKED', revokedAt: new Date() },
+  });
+  if (changed.count !== 1) throw Errors.validation('该批次不是生效中状态');
+
+  const affected = await tx.markingTask.findMany({
+    where: { allocationId: id },
+    select: { paperQuestionId: true, paperQuestion: { select: { paperId: true } } },
+  });
+  const questionIds = [...new Set(affected.map((a) => a.paperQuestionId))];
+  const paperIds = [...new Set(affected.map((a) => a.paperQuestion.paperId))].sort((a, b) =>
+    a < b ? -1 : 1,
+  );
+  for (const paperId of paperIds) {
+    await tx.$executeRaw`SELECT id FROM "Paper" WHERE "id" = ${paperId} FOR UPDATE`;
+  }
+  if (!allowFinalized) {
     const finalizedCount = paperIds.length
       ? await tx.paper.count({ where: { id: { in: paperIds }, finalizedAt: { not: null } } })
       : 0;
     if (finalizedCount > 0) {
-      throw Errors.validation('该批次包含已定稿整卷，禁止撤销；如需重阅请走专门流程');
+      throw Errors.validation('该批次包含已定稿整卷，禁止撤销；如需重阅请走专门重分流程');
     }
-    await tx.markingTask.updateMany({
-      where: { allocationId: id, status: 'PENDING' },
-      data: { status: 'CANCELED' },
-    });
-    if (questionIds.length > 0) {
-      await tx.arbitration.updateMany({
-        where: { paperQuestionId: { in: questionIds }, status: { not: 'COMPLETED' } },
-        data: { status: 'CANCELED', score: null },
-      });
-      // 已完成的旧仲裁同样不得再作为新批次成绩
-      await tx.arbitration.updateMany({
-        where: { paperQuestionId: { in: questionIds }, status: 'COMPLETED' },
-        data: {
-          status: 'CANCELED',
-          score: null,
-          claimedById: null,
-          completedAt: null,
-          remark: null,
-        },
-      });
-      await tx.paperQuestion.updateMany({
-        where: { id: { in: questionIds } },
-        data: { finalScore: null },
-      });
-    }
-    for (const paperId of paperIds) {
-      await recomputePaper(tx, paperId);
-    }
-    await tx.auditLog.create({
+  }
+  await tx.markingTask.updateMany({
+    where: { allocationId: id, status: 'PENDING' },
+    data: { status: 'CANCELED' },
+  });
+  if (questionIds.length > 0) {
+    await tx.arbitration.updateMany({
+      where: { paperQuestionId: { in: questionIds } },
       data: {
-        operatorId,
-        action: 'ALLOCATION_REVOKE',
-        examId: batch.examId,
-        remark: '撤销分配批次 #' + id,
+        status: 'CANCELED',
+        score: null,
+        claimedById: null,
+        completedAt: null,
+        remark: null,
       },
     });
-    return tx.allocationBatch.findUniqueOrThrow({ where: { id }, include: BATCH_INCLUDE });
+    await tx.paperQuestion.updateMany({
+      where: { id: { in: questionIds } },
+      data: { finalScore: null },
+    });
+  }
+  for (const paperId of paperIds) {
+    await recomputePaper(tx, paperId);
+  }
+  await tx.auditLog.create({
+    data: { operatorId, action, examId: batch.examId, remark },
   });
+  return tx.allocationBatch.findUniqueOrThrow({ where: { id }, include: BATCH_INCLUDE });
+}
+
+export async function revokeBatch(id: bigint, operatorId: bigint): Promise<AllocationBatchDto> {
+  const batch = await findBatchOrThrow(id);
+  if (batch.status !== 'ACTIVE') throw Errors.validation('该批次不是生效中状态');
+  const updated = await prisma.$transaction((tx) =>
+    closeBatchInternal(tx, batch, operatorId, 'ALLOCATION_REVOKE', false, '撤销分配批次 #' + id),
+  );
+  return toBatchDto(updated);
+}
+
+/** 已定稿批次重分/重开：保留历史任务审计，但清空当前成绩并允许重新分配 */
+export async function regradeBatch(
+  id: bigint,
+  operatorId: bigint,
+  input: RegradeAllocationInput,
+): Promise<AllocationBatchDto> {
+  const batch = await findBatchOrThrow(id);
+  if (batch.status !== 'ACTIVE') throw Errors.validation('仅生效中的分配批次可重分/重开');
+  const updated = await prisma.$transaction((tx) =>
+    closeBatchInternal(
+      tx,
+      batch,
+      operatorId,
+      'ALLOCATION_REGRADE',
+      true,
+      '已定稿重分/重开批次 #' + id + '，原因：' + input.reason,
+    ),
+  );
   return toBatchDto(updated);
 }
 

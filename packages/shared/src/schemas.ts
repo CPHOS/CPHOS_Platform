@@ -392,6 +392,11 @@ export const createAllocationSchema = z.object({
 });
 export type CreateAllocationInput = z.infer<typeof createAllocationSchema>;
 
+export const regradeAllocationSchema = z.object({
+  reason: z.string().trim().min(1, '请填写重分原因').max(500, '原因过长'),
+});
+export type RegradeAllocationInput = z.infer<typeof regradeAllocationSchema>;
+
 export const listAllocationBatchesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),

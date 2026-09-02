@@ -51,7 +51,7 @@ const STATUS_COLORS: Record<ExamStatus, string> = {
 
 /** 管理后台：考试批次 + 考试级配置 + 状态流转 */
 export function ExamsAdminPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<ExamStatus | undefined>();
   const [q, setQ] = useState('');
@@ -187,6 +187,41 @@ export function ExamsAdminPage() {
     } catch (err) {
       message.error(apiErrorMessage(err));
     }
+  };
+
+  const regradeAllocation = (batchId: string) => {
+    let reason = '';
+    modal.confirm({
+      title: '已定稿重分/重开',
+      content: (
+        <div>
+          <p style={{ color: '#cf222e' }}>将清空该批次当前最终分和仲裁结果，历史记录保留，随后可重新分配。</p>
+          <Input.TextArea
+            rows={3}
+            placeholder="请填写重分原因（必填）"
+            onChange={(e) => {
+              reason = e.target.value;
+            }}
+          />
+        </div>
+      ),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        if (!reason.trim()) {
+          message.error('请填写重分原因');
+          throw new Error('reason required');
+        }
+        try {
+          await adminAllocationApi.regrade(batchId, { reason: reason.trim() });
+          message.success('已进入重分流程');
+          refetchPreview();
+          refetchBatches();
+        } catch (err) {
+          message.error(apiErrorMessage(err));
+          throw err;
+        }
+      },
+    });
   };
 
 
@@ -490,9 +525,14 @@ export function ExamsAdminPage() {
                 title: '操作',
                 render: (_, r: { id: string; status: string }) =>
                   r.status === 'ACTIVE' ? (
-                    <Popconfirm title="撤销后未完成任务将取消，确认？" onConfirm={() => void revokeAllocation(r.id)}>
-                      <a style={{ color: '#cf222e' }}>撤销</a>
-                    </Popconfirm>
+                    <Space size="small">
+                      <Popconfirm title="撤销后未完成任务将取消，确认？" onConfirm={() => void revokeAllocation(r.id)}>
+                        <a>撤销</a>
+                      </Popconfirm>
+                      <a style={{ color: '#cf222e' }} onClick={() => regradeAllocation(r.id)}>
+                        重分/重开
+                      </a>
+                    </Space>
                   ) : (
                     '-'
                   ),

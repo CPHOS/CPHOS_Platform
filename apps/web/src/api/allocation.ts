@@ -4,6 +4,7 @@ import type {
   AllocationPreviewDto,
   CreateAllocationInput,
   MarkingTaskListDto,
+  RegradeAllocationInput,
 } from '@cphos/shared';
 import { http } from './http';
 
@@ -23,6 +24,11 @@ export const adminAllocationApi = {
 
   revoke: (batchId: string) =>
     http.post<AllocationBatchDto>('/admin/allocation/batches/' + batchId + '/revoke', {}).then((r) => r.data),
+
+  regrade: (batchId: string, input: RegradeAllocationInput) =>
+    http
+      .post<AllocationBatchDto>('/admin/allocation/batches/' + batchId + '/regrade', input)
+      .then((r) => r.data),
 };
 
 export const tasksApi = {
