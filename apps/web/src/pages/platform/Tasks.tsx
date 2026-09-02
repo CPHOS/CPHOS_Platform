@@ -100,7 +100,7 @@ export function TasksPage() {
             label: MARKING_TASK_STATUS_LABELS[s],
           }))}
         />
-        <span style={{ color: '#888' }}>双阅分差超过考试配置 gap 时将自动生成仲裁任务。</span>
+        <span style={{ color: '#888' }}>评阅分差超过考试配置 gap 时将自动生成仲裁任务。</span>
       </Space>
       <Table<MarkingTaskDto>
         rowKey="id"

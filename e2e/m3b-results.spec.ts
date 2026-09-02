@@ -79,7 +79,7 @@ test('M3-B 平台成绩查询与逐题详情', async ({ page, request }) => {
     .getByRole('button', { name: '查看详情' })
     .click();
   await expect(page.getByText('成绩详情：' + studentName)).toBeVisible();
-  await expect(page.getByText('双阅分：10')).toBeVisible();
+  await expect(page.getByText('各阅分：10')).toBeVisible();
   await expect(page.getByText('槽位 1').first()).toBeVisible();
   await shot(page, 'result-detail-drawer.png');
 });

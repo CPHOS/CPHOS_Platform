@@ -23,7 +23,7 @@ import { env } from '../../env.js';
 import { Errors } from '../../lib/errors.js';
 
 const PAPER_INCLUDE = {
-  exam: { select: { name: true } },
+  exam: { select: { name: true, config: { select: { reviewCount: true } } } },
   student: { select: { name: true } },
   uploadedBy: {
     select: {
@@ -92,7 +92,10 @@ function toQuestionDto(
       : [],
     arbitrationStatus: revealProcess ? question.arbitration?.status ?? null : null,
     arbitrationScore:
-      revealProcess && question.arbitration?.score !== null && question.arbitration?.score !== undefined
+      revealProcess &&
+      question.arbitration?.status === 'COMPLETED' &&
+      question.arbitration?.score !== null &&
+      question.arbitration?.score !== undefined
         ? Number(question.arbitration.score)
         : null,
     images: question.images.map((image) => toImageDto(image, pages)),
@@ -118,6 +121,7 @@ function toPaperDto(paper: PaperWithRelations, includeInternal = false): PaperDt
     id: String(paper.id),
     examId: String(paper.examId),
     examName: paper.exam.name,
+    examReviewCount: paper.exam.config?.reviewCount ?? 2,
     studentId: String(paper.studentId),
     studentName: paper.student.name,
     uploadedById: String(paper.uploadedById),
@@ -516,28 +520,38 @@ export async function setPaperReviewCount(
   paperId: bigint,
   reviewCount: number | null,
 ): Promise<PaperDto> {
-  const operator = await prisma.userAccount.findUnique({
-    where: { id: operatorId },
-    select: { role: true },
-  });
-  if (!operator) throw Errors.unauthorized();
-  if (reviewCount !== null && reviewCount < 2 && operator.role !== 'SUPER_ADMIN') {
-    throw Errors.validation('仅超级管理员可将评阅次数设置为低于 2');
-  }
-  const paper = await findPaperOrThrow(paperId);
-  if (paper.finalizedAt) throw Errors.validation('整卷已定稿，不能调整评阅次数');
-  if (paper.status === 'ARCHIVED') throw Errors.validation('整卷已归档，不能调整评阅次数');
-  if (reviewCount !== null) {
-    const activeTasks = await prisma.markingTask.count({
+  const updated = await prisma.$transaction(async (tx) => {
+    // 与分配/归档/评分统一锁序：先锁 Paper 行
+    await tx.$executeRaw`SELECT id FROM "Paper" WHERE "id" = ${paperId} FOR UPDATE`;
+    const paper = await tx.paper.findUnique({
+      where: { id: paperId },
+      include: { exam: { select: { config: { select: { reviewCount: true } } } } },
+    });
+    if (!paper) throw Errors.notFound('整卷');
+    const operator = await tx.userAccount.findUnique({
+      where: { id: operatorId },
+      select: { role: true },
+    });
+    if (!operator) throw Errors.unauthorized();
+    const nextValue = reviewCount ?? paper.exam.config?.reviewCount ?? 2;
+    if (nextValue < 2 && operator.role !== 'SUPER_ADMIN') {
+      throw Errors.validation('仅超级管理员可将评阅次数设置为低于 2');
+    }
+    if (paper.finalizedAt) throw Errors.validation('整卷已定稿，不能调整评阅次数');
+    if (paper.status === 'ARCHIVED') throw Errors.validation('整卷已归档，不能调整评阅次数');
+
+    const activeTasks = await tx.markingTask.count({
       where: {
         paperQuestion: { paperId },
         status: { in: ['PENDING', 'COMPLETED'] },
         allocation: { status: 'ACTIVE' },
       },
     });
-    if (activeTasks > 0) throw Errors.validation('整卷已进入分配，不能调整评阅次数');
-  }
-  const updated = await prisma.$transaction(async (tx) => {
+    const currentValue = paper.requiredReviewCount ?? paper.exam.config?.reviewCount ?? 2;
+    if (activeTasks > 0 && currentValue !== nextValue) {
+      throw Errors.validation('整卷已进入分配，不能调整评阅次数');
+    }
+
     const row = await tx.paper.update({
       where: { id: paperId },
       data: { requiredReviewCount: reviewCount },
@@ -548,7 +562,13 @@ export async function setPaperReviewCount(
       operatorId,
       'PAPER_REVIEW_COUNT',
       paper,
-      '调整评阅次数为 ' + (reviewCount === null ? '考试默认' : reviewCount),
+      '评阅次数 ' +
+        currentValue +
+        ' → ' +
+        (reviewCount === null ? '考试默认(' + nextValue + ')' : nextValue) +
+        '（操作角色 ' +
+        operator.role +
+        '）',
     );
     return row;
   });

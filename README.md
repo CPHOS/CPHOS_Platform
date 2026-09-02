@@ -68,9 +68,18 @@ Docker 启动示例：
 
 ```bash
 cp docker-compose.yml.example docker-compose.yml
-# 修改 compose 中所有 CHANGE_ME 密钥与正式域名后
+# 必须替换所有 CHANGE_ME/example.com 占位值，否则生产 env guard 会拒绝启动
 docker compose up -d --build
+# 首个超管（最终镜像含 tsx；参数：用户名 显示名 密码）
+docker compose exec api node apps/api/node_modules/tsx/dist/cli.mjs \
+  apps/api/scripts/init-super-admin.ts super "超级管理员" "<强密码>"
+# 容器模式备份（named volumes）
+docker compose exec -T db pg_dump -U cphos -Fc cphos > backup-$(date +%F).dump
+docker run --rm -v cphos-uploads:/data -v "$PWD":/backup alpine \
+  tar -C /data -czf /backup/uploads-$(date +%F).tgz .
 ```
+
+compose 只把 Web 绑定在 `127.0.0.1:8080`，生产必须在前面再放 TLS 终止代理。
 
 ```bash
 sudo mkdir -p /etc/nginx/snippets
@@ -92,6 +101,8 @@ test -s "$DUMP" || { echo "数据库备份为空: $DUMP" >&2; exit 1; }
 test -s "$UPLOADS" || { echo "上传目录备份为空: $UPLOADS" >&2; exit 1; }
 # 恢复演练（在影子库执行）：pg_restore -d "$SHADOW_DATABASE_URL" --clean --if-exists "$DUMP"
 # 2) 当前按既定决策使用 db push 同步 schema（无迁移历史）；备份校验通过后才允许执行
+#    新唯一约束上线前先检查是否存在同题同人重复分配
+pnpm --filter @cphos/api task:check-duplicates
 #    生产安装需保留 devDependencies 或使用同一 Prisma 版本的 pnpm dlx
 pnpm --filter @cphos/api exec prisma generate
 pnpm --filter @cphos/api exec prisma db push

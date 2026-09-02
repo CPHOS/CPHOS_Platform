@@ -121,8 +121,17 @@ export async function updateMember(
   operatorId: bigint,
   input: UpdateMemberInput,
 ): Promise<MemberDto> {
-  const current = await prisma.memberProfile.findUnique({ where: { userId } });
+  const current = await prisma.memberProfile.findUnique({
+    where: { userId },
+    include: { school: { select: { id: true, isIndividual: true } } },
+  });
   if (!current) throw Errors.notFound('成员');
+  if (current.school?.isIndividual && input.schoolId !== undefined) {
+    const nextSchoolId = input.schoolId === null ? null : BigInt(input.schoolId);
+    if (nextSchoolId !== current.schoolId) {
+      throw Errors.validation('个人/特殊保护成员不允许迁出学校');
+    }
+  }
 
   // 附属教练必须归属某个团队；团队模型已上线，未入团队前不允许切换
   if (input.role === 'COACH' && current.teamId === null) {

@@ -1,4 +1,26 @@
 # CPHOS Docker Compose 模板：复制为 docker-compose.yml 后修改密钥/域名
+x-api-env: &api-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  ALLOW_PUBLIC_BIND: 'true'
+  PORT: 3001
+  DATABASE_URL: postgresql://cphos:CHANGE_ME_DB_PASSWORD@db:5432/cphos
+  JWT_SECRET: CHANGE_ME_STRONG_RANDOM_64
+  CODE_SALT: CHANGE_ME_INDEPENDENT_32
+  CORS_ORIGIN: https://exam.example.com
+  UPLOAD_DIR: /data/uploads
+  UPLOAD_MAX_MB: '20'
+  PAPER_MAX_PAGES: '50'
+  TRUST_PROXY: 'true'
+  SMTP_HOST: smtp.example.com
+  SMTP_PORT: '465'
+  SMTP_SECURE: 'true'
+  SMTP_USER: no-reply@example.com
+  SMTP_PASS: CHANGE_ME_SMTP_PASS
+  SMTP_FROM: 'CPHOS 平台 <no-reply@example.com>'
+  RATE_LIMIT_MAX: '600'
+  RATE_LIMIT_WINDOW: '1 minute'
+
 services:
   db:
     image: postgres:16-alpine
@@ -8,50 +30,62 @@ services:
       POSTGRES_PASSWORD: CHANGE_ME_DB_PASSWORD
     volumes:
       - cphos-db:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U cphos -d cphos']
       interval: 5s
       timeout: 3s
       retries: 20
 
-  api:
+  init:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.api
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
-      ALLOW_PUBLIC_BIND: 'true'
-      PORT: 3001
-      DATABASE_URL: postgresql://cphos:CHANGE_ME_DB_PASSWORD@db:5432/cphos
-      JWT_SECRET: CHANGE_ME_STRONG_RANDOM_64
-      CODE_SALT: CHANGE_ME_INDEPENDENT_32
-      CORS_ORIGIN: https://exam.example.com
-      UPLOAD_DIR: /data/uploads
-      UPLOAD_MAX_MB: '20'
-      PAPER_MAX_PAGES: '50'
-      SMTP_HOST: smtp.example.com
-      SMTP_PORT: '465'
-      SMTP_SECURE: 'true'
-      SMTP_USER: no-reply@example.com
-      SMTP_PASS: CHANGE_ME_SMTP_PASS
-      SMTP_FROM: 'CPHOS 平台 <no-reply@example.com>'
+    environment: *api-env
     volumes:
       - cphos-uploads:/data/uploads
-    # 首次启动执行 db push；生产发布建议改为受控脚本/备份后执行
-    command: sh -c "node_modules/.bin/prisma db push --skip-generate --schema apps/api/prisma/schema.prisma && node apps/api/dist/server.js"
+    restart: 'no'
+    command: ['apps/api/node_modules/.bin/prisma', 'db', 'push', '--skip-generate', '--schema', 'apps/api/prisma/schema.prisma']
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.api
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment: *api-env
+    volumes:
+      - cphos-uploads:/data/uploads
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3001/api/health/ready >/dev/null || exit 1']
+      interval: 10s
+      timeout: 3s
+      retries: 12
 
   web:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.web
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
-      - '8080:80'
+      - '127.0.0.1:8080:80'
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }
 
 volumes:
   cphos-db:

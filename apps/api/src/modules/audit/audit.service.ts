@@ -327,11 +327,11 @@ export async function review(
 
         const schoolId = app.schoolId;
         const school = schoolId
-          ? await tx.school.findUnique({ where: { id: schoolId }, select: { name: true } })
+          ? await tx.school.findUnique({ where: { id: schoolId }, select: { isIndividual: true } })
           : null;
         const uploadLimit =
           decision.uploadLimit ??
-          (school?.name === INDIVIDUAL_SCHOOL_NAME ? 1 : DEFAULT_UPLOAD_LIMIT);
+          (school?.isIndividual ? 1 : DEFAULT_UPLOAD_LIMIT);
 
         // 原子抢占：仅首个事务能将 PENDING 流转，避免并发双重审批（updateMany 条件更新）
         const transitioned = await tx.auditApplication.updateMany({

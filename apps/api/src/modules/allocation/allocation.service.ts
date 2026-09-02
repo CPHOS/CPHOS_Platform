@@ -132,7 +132,7 @@ export async function previewAllocation(examId: bigint): Promise<AllocationPrevi
           auditStatus: 1,
           user: { status: 'ACTIVE' },
           // 个人参赛者不参与阅卷分配
-          school: { name: { not: '个人' } },
+          school: { isIndividual: false },
         },
         select: { id: true, defaultSlot: true },
       })
@@ -285,7 +285,7 @@ export async function createAllocation(
         operatorId,
         action: 'ALLOCATION_CREATE',
         examId,
-        remark: '创建分配批次，共 ' + tasks.length + ' 个双阅任务',
+        remark: '创建分配批次，共 ' + tasks.length + ' 个阅卷任务',
       },
     });
     return tx.allocationBatch.findUniqueOrThrow({ where: { id: created.id }, include: BATCH_INCLUDE });
@@ -357,7 +357,13 @@ export async function revokeBatch(id: bigint, operatorId: bigint): Promise<Alloc
       // 已完成的旧仲裁同样不得再作为新批次成绩
       await tx.arbitration.updateMany({
         where: { paperQuestionId: { in: questionIds }, status: 'COMPLETED' },
-        data: { status: 'CANCELED' },
+        data: {
+          status: 'CANCELED',
+          score: null,
+          claimedById: null,
+          completedAt: null,
+          remark: null,
+        },
       });
       await tx.paperQuestion.updateMany({
         where: { id: { in: questionIds } },

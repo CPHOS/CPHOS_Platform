@@ -58,7 +58,7 @@ export function AdminPapersPage() {
       title: '评阅次数',
       dataIndex: 'requiredReviewCount',
       width: 110,
-      render: (v: number | null) => (v === null ? '考试默认' : v + ' 次'),
+      render: (v: number | null, paper) => (v === null ? '考试默认(' + paper.examReviewCount + ' 次)' : v + ' 次'),
     },
     { title: '总分', dataIndex: 'score', width: 80, render: (v: number | null) => v ?? '-' },
     {

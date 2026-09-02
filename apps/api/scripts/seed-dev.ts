@@ -26,8 +26,8 @@ const schoolSeeds: Array<[string, bigint]> = [
 for (const [name, areaId] of schoolSeeds) {
   await prisma.school.upsert({
     where: { name_areaId: { name, areaId } },
-    create: { name, areaId },
-    update: {},
+    create: { name, areaId, ...(name === '个人' ? { isIndividual: true } : {}) },
+    update: name === '个人' ? { isIndividual: true } : {},
   });
 }
 

@@ -62,6 +62,24 @@ const schema = z
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') return;
 
+    const looksPlaceholder = (v: string | undefined) =>
+      !!v && /(change[_-]?me|example|placeholder)/i.test(v);
+    for (const [path, val] of [
+      ['JWT_SECRET', value.JWT_SECRET],
+      ['CODE_SALT', value.CODE_SALT],
+      ['DATABASE_URL', value.DATABASE_URL],
+      ['SMTP_PASS', value.SMTP_PASS],
+      ['SMTP_FROM', value.SMTP_FROM],
+    ] as const) {
+      if (looksPlaceholder(val)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [path],
+          message: '生产环境 ' + path + ' 不能使用示例/占位值',
+        });
+      }
+    }
+
     // 生产环境 fail-fast：禁止落到公开默认值或明显过短的密钥。
     if (value.JWT_SECRET === INSECURE_JWT_DEFAULT || value.JWT_SECRET.length < 32) {
       ctx.addIssue({

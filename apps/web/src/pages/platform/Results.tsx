@@ -94,7 +94,7 @@ export function ResultsPage() {
   return (
     <Card>
       <Typography.Paragraph type="secondary">
-        仅展示所有题目均已定稿并汇总总分的整卷；可回看双阅分、仲裁结果与题目组图。
+        仅展示所有题目均已定稿并汇总总分的整卷；可回看各评阅分、仲裁结果与题目组图。
       </Typography.Paragraph>
       <Table<MyRankingEntryDto>
         rowKey="paperId"
@@ -136,7 +136,7 @@ export function ResultsPage() {
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Space wrap>
-                    <span>双阅分：{question.roundScores.join(' / ') || '-'}</span>
+                    <span>各阅分：{question.roundScores.join(' / ') || '-'}</span>
                     {question.arbitrationStatus ? (
                       <Tag color="orange">
                         仲裁{ARBITRATION_STATUS_LABELS[question.arbitrationStatus as ArbitrationStatus] ??

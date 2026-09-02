@@ -15,3 +15,8 @@ test-results/
 playwright-report/
 e2e/artifacts/
 .uploads/
+# Docker/local secrets and backups
+docker-compose.yml
+docker-compose.override.yml
+backup-*.dump
+uploads-*.tgz

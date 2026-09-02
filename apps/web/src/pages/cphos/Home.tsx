@@ -9,7 +9,7 @@ interface Feature {
 }
 
 const FEATURES: Feature[] = [
-  { icon: <AuditOutlined />, title: '仲裁任务', desc: '处理双阅分差超阈值的仲裁任务（第 9/10 题实验题）' },
+  { icon: <AuditOutlined />, title: '仲裁任务', desc: '处理评阅分差超阈值的仲裁任务' },
   { icon: <EditOutlined />, title: '内部阅卷', desc: 'CPHOS 成员不参与普通分配，承担内部题目阅卷' },
   { icon: <ExperimentOutlined />, title: '命题/组织', desc: '组织相关功能（规划中）' },
 ];

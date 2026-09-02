@@ -10,3 +10,10 @@ playwright-report
 .git
 .env
 **/.env
+docker-compose*.yml
+.env
+**/.env
+**/.env.*
+**/.npmrc
+backup-*.dump
+uploads-*.tgz

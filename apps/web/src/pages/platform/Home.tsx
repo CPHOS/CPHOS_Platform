@@ -14,7 +14,7 @@ interface Feature {
 const FEATURES: Feature[] = [
   { icon: <TeamOutlined />, title: '学生管理', desc: '创建与管理名下学生（毕业年份、学校、奖项）' },
   { icon: <FileExcelOutlined />, title: '报名与上传', desc: '选择考试批次，上传学生答题卡（逐题图片）' },
-  { icon: <TrophyOutlined />, title: '阅卷任务', desc: '按默认批阅槽位领取任务，双阅打分' },
+  { icon: <TrophyOutlined />, title: '阅卷任务', desc: '按评阅规则领取任务并打分' },
   { icon: <AppstoreOutlined />, title: '成绩与排名', desc: '查看学生成绩与分段排名' },
 ];
 

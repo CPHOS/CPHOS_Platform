@@ -113,6 +113,9 @@ export async function createSchool(input: SchoolInput): Promise<SchoolDto> {
 export async function updateSchool(id: bigint, input: UpdateSchoolInput): Promise<SchoolDto> {
   const existing = await prisma.school.findUnique({ where: { id } });
   if (!existing) throw Errors.notFound('学校');
+  if (existing.isIndividual && (input.name !== undefined || input.areaId !== undefined)) {
+    throw Errors.validation('个人/特殊保护学校不允许改名或移区');
+  }
   if (input.areaId !== undefined) {
     const area = await prisma.area.findUnique({ where: { id: BigInt(input.areaId) } });
     if (!area) throw Errors.notFound('赛区');
@@ -135,6 +138,7 @@ export async function updateSchool(id: bigint, input: UpdateSchoolInput): Promis
 export async function deleteSchool(id: bigint): Promise<void> {
   const existing = await prisma.school.findUnique({ where: { id } });
   if (!existing) throw Errors.notFound('学校');
+  if (existing.isIndividual) throw Errors.validation('个人/特殊保护学校不允许删除');
   const [members, applications, refs] = await Promise.all([
     prisma.memberProfile.count({ where: { schoolId: id } }),
     prisma.auditApplication.count({ where: { schoolId: id } }),

@@ -74,7 +74,7 @@ export function ArbitrationPage() {
     { title: '学生', dataIndex: 'studentName', ellipsis: true },
     { title: '题目', render: (_, r) => '槽位 ' + r.slot + (r.questionLabel ? '（' + r.questionLabel + '）' : '') },
     {
-      title: '双阅分',
+      title: '各阅分',
       render: (_, r) => r.roundScores.map((score) => score ?? '-').join(' / '),
       responsive: ['md'],
     },
@@ -99,7 +99,7 @@ export function ArbitrationPage() {
               </Button>
             )}
             {!r.claimedById || r.claimedById === me?.id ? (
-              <Button size="small" type="primary" onClick={() => setGrading(r)}>
+              <Button size="small" type="primary" onClick={() => { form.resetFields(); setGrading(r); }}>
                 打分
               </Button>
             ) : null}

@@ -474,6 +474,8 @@ model MarkingTask {
   updatedAt       DateTime          @updatedAt
 
   // 同一题同一轮允许多次历史分配；仅当前 ACTIVE 批次的任务生效
+  @@unique([allocationId, paperQuestionId, roundNo])
+  @@unique([allocationId, paperQuestionId, assigneeId])
   @@index([paperQuestionId, roundNo])
   @@index([assigneeId, status])
   @@index([allocationId])
@@ -522,6 +524,8 @@ model Area {
 model School {
   id           BigInt             @id @default(autoincrement())
   name         String
+  // 个人/特殊保护学校：不可改名/移区，阅卷分配排除
+  isIndividual Boolean            @default(false)
   areaId       BigInt
   area         Area               @relation(fields: [areaId], references: [id])
   members      MemberProfile[]

@@ -143,6 +143,13 @@ test('安全回归：路径穿越 / 跨卷删除 / 撤销重分配 / CSV 注入'
   expect(second.ok()).toBeTruthy();
   const secondBatch = await second.json();
 
+  // 生效任务存在时，即使超管也不能改变评阅次数（含恢复默认）
+  const activeCountChange = await request.patch('/api/admin/papers/' + papers[0].id + '/review-count', {
+    headers: superAuth,
+    data: { reviewCount: 1 },
+  });
+  expect(activeCountChange.status()).toBe(400);
+
   // 分差触发仲裁；此时结束考试应被拒绝
   const tasks = await request.get('/api/tasks/mine', { headers: coachAuth }).then((r: any) => r.json());
   const myTasks = tasks.items.filter((t: any) => t.examId === exam.id);

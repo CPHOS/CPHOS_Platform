@@ -430,7 +430,12 @@ export function ExamsAdminPage() {
           <Button
             type="primary"
             loading={allocatingNow}
-            disabled={!allocPreview || allocPreview.questionCount === 0 || allocPreview.unassignedSlots.length > 0}
+            disabled={
+              !allocPreview ||
+              allocPreview.questionCount === 0 ||
+              allocPreview.unassignedSlots.length > 0 ||
+              (allocBatches?.items ?? []).some((b) => b.status === 'ACTIVE')
+            }
             onClick={() => void runAllocation()}
           >
             生成均衡分配

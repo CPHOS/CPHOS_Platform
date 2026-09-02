@@ -1,6 +1,6 @@
 # CPHOS API 镜像（构建上下文必须是仓库根目录）
 FROM node:20-alpine AS build
-RUN corepack enable
+RUN apk add --no-cache openssl libc6-compat && corepack enable
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
@@ -13,9 +13,10 @@ RUN pnpm --filter @cphos/shared build \
   && pnpm --filter @cphos/api build
 
 FROM node:20-alpine
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl libc6-compat && mkdir -p /data/uploads && chown -R node:node /data /app
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /app /app
+COPY --from=build --chown=node:node /app /app
+USER node
 EXPOSE 3001
 CMD ["node", "apps/api/dist/server.js"]

@@ -96,14 +96,39 @@ export async function gradeMarkingTask(
       },
     });
 
+    // 锁内重读当前配置，避免与逐卷评阅次数变更产生偏差
+    const freshPaper = await tx.paper.findUniqueOrThrow({
+      where: { id: task.paperQuestion.paper.id },
+      select: {
+        requiredReviewCount: true,
+        exam: { select: { config: { select: { reviewCount: true } } } },
+      },
+    });
     const requiredReviews =
-      task.paperQuestion.paper.requiredReviewCount ??
-      Number(task.paperQuestion.paper.exam.config?.reviewCount ?? 2);
+      freshPaper.requiredReviewCount ?? Number(freshPaper.exam.config?.reviewCount ?? 2);
+    const sameAssignee = await tx.markingTask.findFirst({
+      where: {
+        paperQuestionId: task.paperQuestionId,
+        assigneeId: profile.id,
+        id: { not: taskId },
+        allocation: { status: 'ACTIVE' },
+      },
+      select: { id: true },
+    });
+    if (sameAssignee) {
+      throw Errors.validation('同一题不允许同一阅卷人重复评阅，请撤销重分');
+    }
     const tasks = await tx.markingTask.findMany({
       where: { paperQuestionId: task.paperQuestionId, allocation: { status: 'ACTIVE' } },
       orderBy: { roundNo: 'asc' },
       select: { id: true, roundNo: true, score: true, status: true },
     });
+    if (
+      tasks.length !== requiredReviews &&
+      tasks.every((t) => t.status === 'COMPLETED')
+    ) {
+      throw Errors.validation('评阅任务数与当前规则不一致，请撤销批次重分');
+    }
     if (tasks.length === requiredReviews && tasks.every((t) => t.status === 'COMPLETED')) {
       const scores = tasks.map((t) => (t.score === null ? new Prisma.Decimal(0) : t.score));
       const gap = new Prisma.Decimal(task.paperQuestion.paper.exam.config?.gap ?? 0);
@@ -208,7 +233,7 @@ export async function listArbitrations(
     status: a.status,
     claimedById: a.claimedById === null ? null : String(a.claimedById),
     claimedByName: userName(a.claimedBy),
-    score: a.score === null ? null : Number(a.score),
+    score: a.status === 'COMPLETED' && a.score !== null ? Number(a.score) : null,
     roundScores: a.paperQuestion.markingTasks.map((t) => (t.score === null ? null : Number(t.score))),
     images: a.paperQuestion.images.map((image) => ({
       id: String(image.id),
@@ -231,9 +256,16 @@ export async function listArbitrations(
 export async function claimArbitration(userId: bigint, id: bigint): Promise<void> {
   const existing = await prisma.arbitration.findUnique({
     where: { id },
-    include: { paperQuestion: { include: { paper: { select: { exam: { select: { status: true } } } } } } },
+    include: {
+      paperQuestion: {
+        include: { paper: { select: { status: true, exam: { select: { status: true } } } } },
+      },
+    },
   });
   if (!existing) throw Errors.notFound('仲裁任务');
+  if (existing.paperQuestion.paper.status === 'ARCHIVED') {
+    throw Errors.validation('整卷已归档，不能认领仲裁');
+  }
   if (existing.status === 'COMPLETED' || existing.status === 'CANCELED') {
     throw Errors.validation('仲裁任务已完成或已取消');
   }
@@ -268,9 +300,18 @@ export async function gradeArbitration(
 ): Promise<void> {
   const arbitration = await prisma.arbitration.findUnique({
     where: { id },
-    include: { paperQuestion: { include: { paper: { select: { id: true, exam: { select: { status: true } }, finalizedAt: true } } } } },
+    include: {
+      paperQuestion: {
+        include: {
+          paper: { select: { id: true, status: true, exam: { select: { status: true } }, finalizedAt: true } },
+        },
+      },
+    },
   });
   if (!arbitration) throw Errors.notFound('仲裁任务');
+  if (arbitration.paperQuestion.paper.status === 'ARCHIVED') {
+    throw Errors.validation('整卷已归档，不能仲裁');
+  }
   if (arbitration.status === 'COMPLETED' || arbitration.status === 'CANCELED') {
     throw Errors.validation('仲裁任务已完成或已取消');
   }

@@ -341,6 +341,7 @@ export interface PaperDto {
   id: string;
   examId: string;
   examName: string;
+  examReviewCount: number;
   studentId: string;
   studentName: string;
   uploadedById: string;

@@ -40,8 +40,8 @@ async function main() {
   });
   const personalSchool = await prisma.school.upsert({
     where: { name_areaId: { name: '个人', areaId: area.id } },
-    create: { name: '个人', areaId: area.id },
-    update: {},
+    create: { name: '个人', areaId: area.id, isIndividual: true },
+    update: { isIndividual: true },
   });
 
   // 内部账号：超管 / 管理员 / CPHOS 成员
