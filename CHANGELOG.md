@@ -12,6 +12,7 @@
 ### 变更
 
 - 重写根 `README.md`，补全功能概览、技术栈、仓库结构、环境要求、测试、对象存储与部署说明。
+- 将旧平台调研报告整理为公开版：脱敏线上地址、管理员用户名与抽样姓名，删除未随仓库公开的探针复跑说明。
 - 更新 `docs/README.md` 当前状态、模块完成度与贡献/安全指引链接。
 
 ## [0.1.0] - 2026-09-02
@@ -38,6 +39,3 @@
 
 - 对象存储与 CPHOS/Question_DB 对齐：文件系统本地 adapter + 数据库元数据，保留未来 MinIO/S3 adapter 扩展位。
 - 数据库 schema 按项目决策使用 `prisma db push` 同步，不保留 Prisma migration 历史。
-
-[Unreleased]: https://github.com/CPHOS/CPHOS_Platform/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/CPHOS/CPHOS_Platform/releases/tag/v0.1.0
