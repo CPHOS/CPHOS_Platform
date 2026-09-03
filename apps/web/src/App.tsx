@@ -102,17 +102,41 @@ export function App() {
             <ShellLayout
               kind="admin"
               nav={[
-                { key: '/admin', label: '概览', icon: <AppstoreOutlined /> },
-                { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined /> },
-                { key: '/admin/members', label: '成员管理', icon: <TeamOutlined /> },
-                { key: '/admin/teams', label: '团队管理', icon: <ApartmentOutlined /> },
-                { key: '/admin/exams', label: '考试管理', icon: <ScheduleOutlined /> },
-                { key: '/admin/students', label: '学生名册', icon: <SolutionOutlined /> },
-                { key: '/admin/papers', label: '整卷管理', icon: <FileTextOutlined /> },
-                { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined /> },
-                { key: '/admin/dict', label: '字典维护', icon: <DatabaseOutlined /> },
-                { key: '/admin/logs', label: '审计日志', icon: <HistoryOutlined /> },
-                { key: '/admin/profile', label: '个人信息', icon: <IdcardOutlined /> },
+                {
+                  type: 'group',
+                  label: '常用',
+                  children: [
+                    { key: '/admin', label: '概览', icon: <AppstoreOutlined /> },
+                    { key: '/admin/profile', label: '个人信息', icon: <IdcardOutlined /> },
+                  ],
+                },
+                {
+                  type: 'group',
+                  label: '审核与组织',
+                  children: [
+                    { key: '/admin/audit', label: '用户审核', icon: <AuditOutlined /> },
+                    { key: '/admin/members', label: '成员管理', icon: <TeamOutlined /> },
+                    { key: '/admin/teams', label: '团队管理', icon: <ApartmentOutlined /> },
+                  ],
+                },
+                {
+                  type: 'group',
+                  label: '考试',
+                  children: [
+                    { key: '/admin/exams', label: '考试管理', icon: <ScheduleOutlined /> },
+                    { key: '/admin/students', label: '学生名册', icon: <SolutionOutlined /> },
+                    { key: '/admin/papers', label: '整卷管理', icon: <FileTextOutlined /> },
+                  ],
+                },
+                {
+                  type: 'group',
+                  label: '系统',
+                  children: [
+                    { key: '/admin/accounts', label: '账号管理', icon: <UserOutlined /> },
+                    { key: '/admin/dict', label: '字典维护', icon: <DatabaseOutlined /> },
+                    { key: '/admin/logs', label: '审计日志', icon: <HistoryOutlined /> },
+                  ],
+                },
               ]}
             />
           </RequireAuth>
