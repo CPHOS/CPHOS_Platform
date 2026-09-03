@@ -8,7 +8,8 @@
 
 - 建立开源项目文档基线：`LICENSE`（AGPL-3.0-or-later）、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`CHANGELOG.md`、Issue / PR 模板与 `.editorconfig`。
 - 为 `package.json` 增加许可证、仓库、Issue 与主页元数据。
-- 字典维护新增 `DICT_CREATE` / `DICT_UPDATE` / `DICT_DELETE` 审计动作，赛区/学校/年级/奖项的增删改均写入审计日志。
+- 字典维护新增 `DICT_CREATE` / `DICT_UPDATE` / `DICT_DELETE` 审计动作，赛区/学校/年级/奖项的增删改均写入审计日志；学校移区审计记录旧/新赛区与对象 ID。
+- 新增全量字典审计 E2E：覆盖四类创建/修改/删除、唯一键冲突回滚、引用中删除失败不写删除审计。
 
 ### 变更
 

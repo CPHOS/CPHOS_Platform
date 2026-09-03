@@ -135,24 +135,38 @@ export async function createSchool(operatorId: bigint, input: SchoolInput): Prom
 export async function updateSchool(operatorId: bigint, id: bigint, input: UpdateSchoolInput): Promise<SchoolDto> {
   try {
     const school = await prisma.$transaction(async (tx) => {
-      const existing = await tx.school.findUnique({ where: { id } });
+      const existing = await tx.school.findUnique({ where: { id }, include: { area: true } });
       if (!existing) throw Errors.notFound('学校');
       if (existing.isIndividual && (input.name !== undefined || input.areaId !== undefined)) {
         throw Errors.validation('个人/特殊保护学校不允许改名或移区');
       }
-      if (input.areaId !== undefined) {
-        const area = await tx.area.findUnique({ where: { id: BigInt(input.areaId) } });
-        if (!area) throw Errors.notFound('赛区');
-      }
+      const nextAreaId = input.areaId === undefined ? existing.areaId : BigInt(input.areaId);
+      const nextArea = input.areaId === undefined
+        ? existing.area
+        : await tx.area.findUnique({ where: { id: nextAreaId } });
+      if (!nextArea) throw Errors.notFound('赛区');
       const updated = await tx.school.update({
         where: { id },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.areaId !== undefined ? { areaId: BigInt(input.areaId) } : {}),
+          ...(input.areaId !== undefined ? { areaId: nextAreaId } : {}),
         },
         include: { area: true },
       });
-      await writeDictAudit(tx, operatorId, AuditAction.DICT_UPDATE, '修改学校「' + existing.name + '」为「' + updated.name + '」');
+      const changes: string[] = [];
+      if (input.name !== undefined) {
+        changes.push('名称「' + existing.name + '」→「' + updated.name + '」');
+      }
+      if (nextAreaId !== existing.areaId) {
+        changes.push('赛区「' + (existing.area?.name ?? String(existing.areaId)) + '」→「' + nextArea.name + '」');
+      }
+      const detail = changes.length > 0 ? changes.join('；') : '无字段变化';
+      await writeDictAudit(
+        tx,
+        operatorId,
+        AuditAction.DICT_UPDATE,
+        '修改学校「' + existing.name + '」#' + existing.id + '：' + detail,
+      );
       return updated;
     });
     return toSchoolDto(school);
