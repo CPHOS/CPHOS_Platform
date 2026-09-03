@@ -224,7 +224,6 @@ export interface DictBundleDto {
   schools: SchoolDto[];
   grades: NameDictDto[];
   prizes: NameDictDto[];
-  topics: NameDictDto[];
 }
 
 // ---------- 考试域：M2-A ----------

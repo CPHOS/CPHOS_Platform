@@ -19,7 +19,7 @@ import { useState } from 'react';
 import { adminDictApi } from '../../../api/dict';
 import { apiErrorMessage } from '../../../api/http';
 
-type SimpleKind = 'grade' | 'prize' | 'topic';
+type SimpleKind = 'grade' | 'prize';
 
 interface DictForm {
   name: string;
@@ -34,10 +34,9 @@ interface ModalState {
 const SIMPLE_META: Record<SimpleKind, { label: string; create: (name: string) => Promise<unknown>; update: (id: string, name: string) => Promise<unknown>; remove: (id: string) => Promise<unknown> }> = {
   grade: { label: '年级', create: adminDictApi.createGrade, update: adminDictApi.updateGrade, remove: adminDictApi.deleteGrade },
   prize: { label: '奖项', create: adminDictApi.createPrize, update: adminDictApi.updatePrize, remove: adminDictApi.deletePrize },
-  topic: { label: '题号', create: adminDictApi.createTopic, update: adminDictApi.updateTopic, remove: adminDictApi.deleteTopic },
 };
 
-/** 管理员：字典维护（赛区/学校/年级/奖项/题号） */
+/** 管理员：字典维护（赛区/学校/年级/奖项） */
 export function DictAdminPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -195,7 +194,7 @@ export function DictAdminPage() {
         </div>
       ),
     },
-    ...(['grade', 'prize', 'topic'] as SimpleKind[]).map((kind) => ({
+    ...(['grade', 'prize'] as SimpleKind[]).map((kind) => ({
       key: kind + 's',
       label: SIMPLE_META[kind].label,
       children: (
@@ -208,7 +207,7 @@ export function DictAdminPage() {
             size="small"
             loading={isLoading}
             columns={simpleColumns(kind)}
-            dataSource={data ? data[(kind + 's') as 'grades' | 'prizes' | 'topics'] : []}
+            dataSource={data ? data[(kind + 's') as 'grades' | 'prizes'] : []}
             pagination={false}
           />
         </div>

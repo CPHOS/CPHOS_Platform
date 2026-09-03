@@ -11,7 +11,7 @@ interface Feature {
 const FEATURES: Feature[] = [
   { icon: <AuditOutlined />, title: '用户审核', desc: '审核注册用户资料；认领为可选兼容能力，不依赖历史数据' },
   { icon: <TeamOutlined />, title: '成员与团队', desc: '角色 / 槽位 / 个人限额；团队共享上传限额与成员管理' },
-  { icon: <FileExcelOutlined />, title: '字典维护', desc: '赛区 / 学校 / 年级 / 奖项 / 题号，管理员独立维护' },
+  { icon: <FileExcelOutlined />, title: '字典维护', desc: '赛区 / 学校 / 年级 / 奖项，管理员独立维护' },
   { icon: <TrophyOutlined />, title: '考试与阅卷', desc: '考试批次/配置已开放；上传、分配、阅卷、仲裁在下一子块' },
 ];
 

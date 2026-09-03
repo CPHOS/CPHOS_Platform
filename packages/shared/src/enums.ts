@@ -140,6 +140,9 @@ export const AUDIT_ACTIONS = [
   'ARBITRATION_CLAIM',
   'ARBITRATION_GRADE',
   'RANKING_EXPORT',
+  'DICT_CREATE',
+  'DICT_UPDATE',
+  'DICT_DELETE',
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTIONS)[number];
 
@@ -181,10 +184,13 @@ export const AUDIT_ACTION_LABELS: Record<AuditActionValue, string> = {
   ARBITRATION_CLAIM: '认领仲裁任务',
   ARBITRATION_GRADE: '仲裁打分',
   RANKING_EXPORT: '导出成绩排名',
+  DICT_CREATE: '新增字典项',
+  DICT_UPDATE: '修改字典项',
+  DICT_DELETE: '删除字典项',
 };
 
 /** 字典类型（后台维护页签） */
-export const DICT_KINDS = ['areas', 'schools', 'grades', 'prizes', 'topics'] as const;
+export const DICT_KINDS = ['areas', 'schools', 'grades', 'prizes'] as const;
 export type DictKind = (typeof DICT_KINDS)[number];
 
 export const DICT_KIND_LABELS: Record<DictKind, string> = {
@@ -192,7 +198,6 @@ export const DICT_KIND_LABELS: Record<DictKind, string> = {
   schools: '学校',
   grades: '年级',
   prizes: '奖项',
-  topics: '题号',
 };
 
 /** API 错误码（稳定契约，前端据此处理） */

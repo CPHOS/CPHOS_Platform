@@ -23,6 +23,9 @@ const ACTION_COLORS: Record<string, string> = {
   TEAM_CREATE: 'green',
   TEAM_UPDATE: 'lime',
   TEAM_DELETE: 'magenta',
+  DICT_CREATE: 'blue',
+  DICT_UPDATE: 'geekblue',
+  DICT_DELETE: 'volcano',
 };
 
 function actionLabel(action: string): string {

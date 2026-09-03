@@ -10,93 +10,76 @@ import {
   createGrade,
   createPrize,
   createSchool,
-  createTopic,
   deleteArea,
   deleteGrade,
   deletePrize,
   deleteSchool,
-  deleteTopic,
   getDictBundle,
   updateArea,
   updateGrade,
   updatePrize,
   updateSchool,
-  updateTopic,
 } from './dict.service.js';
 
-/** 管理侧：字典维护（赛区/学校/年级/奖项/题号），仅 ADMIN / SUPER_ADMIN */
+/** 管理侧：字典维护（赛区/学校/年级/奖项），仅 ADMIN / SUPER_ADMIN。所有增删改均写审计日志。 */
 export async function adminDictRoutes(app: FastifyInstance): Promise<void> {
   const guard = [app.authenticate, app.requireRole('ADMIN', 'SUPER_ADMIN')];
 
   app.get('/dict', { onRequest: guard }, async () => getDictBundle());
 
   app.post('/dict/areas', { onRequest: guard }, async (req, reply) => {
-    const item = await createArea(dictNameSchema.parse(req.body));
+    const item = await createArea(BigInt((req.user as { sub: string }).sub), dictNameSchema.parse(req.body));
     return reply.code(201).send(item);
   });
   app.patch('/dict/areas/:id', { onRequest: guard }, async (req) => {
     const { id } = req.params as { id: string };
-    return updateArea(BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
+    return updateArea(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
   });
   app.delete('/dict/areas/:id', { onRequest: guard }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await deleteArea(BigInt(idSchema.parse(id)));
+    await deleteArea(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)));
     return reply.code(204).send();
   });
 
   app.post('/dict/schools', { onRequest: guard }, async (req, reply) => {
-    const item = await createSchool(schoolInputSchema.parse(req.body));
+    const item = await createSchool(BigInt((req.user as { sub: string }).sub), schoolInputSchema.parse(req.body));
     return reply.code(201).send(item);
   });
   app.patch('/dict/schools/:id', { onRequest: guard }, async (req) => {
     const { id } = req.params as { id: string };
-    return updateSchool(BigInt(idSchema.parse(id)), updateSchoolSchema.parse(req.body));
+    return updateSchool(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)), updateSchoolSchema.parse(req.body));
   });
   app.delete('/dict/schools/:id', { onRequest: guard }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await deleteSchool(BigInt(idSchema.parse(id)));
+    await deleteSchool(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)));
     return reply.code(204).send();
   });
 
   app.post('/dict/grades', { onRequest: guard }, async (req, reply) => {
-    const item = await createGrade(dictNameSchema.parse(req.body));
+    const item = await createGrade(BigInt((req.user as { sub: string }).sub), dictNameSchema.parse(req.body));
     return reply.code(201).send(item);
   });
   app.patch('/dict/grades/:id', { onRequest: guard }, async (req) => {
     const { id } = req.params as { id: string };
-    return updateGrade(BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
+    return updateGrade(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
   });
   app.delete('/dict/grades/:id', { onRequest: guard }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await deleteGrade(BigInt(idSchema.parse(id)));
+    await deleteGrade(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)));
     return reply.code(204).send();
   });
 
   app.post('/dict/prizes', { onRequest: guard }, async (req, reply) => {
-    const item = await createPrize(dictNameSchema.parse(req.body));
+    const item = await createPrize(BigInt((req.user as { sub: string }).sub), dictNameSchema.parse(req.body));
     return reply.code(201).send(item);
   });
   app.patch('/dict/prizes/:id', { onRequest: guard }, async (req) => {
     const { id } = req.params as { id: string };
-    return updatePrize(BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
+    return updatePrize(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
   });
   app.delete('/dict/prizes/:id', { onRequest: guard }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await deletePrize(BigInt(idSchema.parse(id)));
-    return reply.code(204).send();
-  });
-
-  app.post('/dict/topics', { onRequest: guard }, async (req, reply) => {
-    const item = await createTopic(dictNameSchema.parse(req.body));
-    return reply.code(201).send(item);
-  });
-  app.patch('/dict/topics/:id', { onRequest: guard }, async (req) => {
-    const { id } = req.params as { id: string };
-    return updateTopic(BigInt(idSchema.parse(id)), dictNameSchema.parse(req.body));
-  });
-  app.delete('/dict/topics/:id', { onRequest: guard }, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    await deleteTopic(BigInt(idSchema.parse(id)));
+    await deletePrize(BigInt((req.user as { sub: string }).sub), BigInt(idSchema.parse(id)));
     return reply.code(204).send();
   });
 }

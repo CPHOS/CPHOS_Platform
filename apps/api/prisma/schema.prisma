@@ -79,6 +79,9 @@ enum AuditAction {
   ARBITRATION_CLAIM // 认领仲裁任务
   ARBITRATION_GRADE // 仲裁打分
   RANKING_EXPORT // 导出成绩排名
+  DICT_CREATE // 新增字典项
+  DICT_UPDATE // 修改字典项
+  DICT_DELETE // 删除字典项
 }
 
 enum MemberRole {

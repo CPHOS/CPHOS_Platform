@@ -38,9 +38,4 @@ export const adminDictApi = {
     http.patch<NameDictDto>('/admin/dict/prizes/' + id, { name }).then((r) => r.data),
   deletePrize: (id: string) => http.delete('/admin/dict/prizes/' + id),
 
-  createTopic: (name: string) =>
-    http.post<NameDictDto>('/admin/dict/topics', { name }).then((r) => r.data),
-  updateTopic: (id: string, name: string) =>
-    http.patch<NameDictDto>('/admin/dict/topics/' + id, { name }).then((r) => r.data),
-  deleteTopic: (id: string) => http.delete('/admin/dict/topics/' + id),
 };

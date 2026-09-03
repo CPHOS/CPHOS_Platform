@@ -8,6 +8,7 @@
 
 - 建立开源项目文档基线：`LICENSE`（AGPL-3.0-or-later）、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`CHANGELOG.md`、Issue / PR 模板与 `.editorconfig`。
 - 为 `package.json` 增加许可证、仓库、Issue 与主页元数据。
+- 字典维护新增 `DICT_CREATE` / `DICT_UPDATE` / `DICT_DELETE` 审计动作，赛区/学校/年级/奖项的增删改均写入审计日志。
 
 ### 变更
 
@@ -17,6 +18,7 @@
 - 修正 `docs/02_新系统设计.md` 中与当前实现不一致的状态、对象存储与 Prisma migration 表述。
 - 独立代码质检后的修复：分配池统一按 `School.isIndividual` 排除个人参赛者；仲裁同校冲突覆盖上传者、学生 owner 与学生本人；`addPaperPage` 与整卷 READY 强制校验 `StoredObject`；`OBJECT_STORAGE_DRIVER` 对未实现驱动 fail-fast；整卷/页/图片写操作增加事务锁与复核；对外 DTO 移除 `fileKey` / `pageFileKey`。
 - 测试增强：对象文件写入/哈希/清理、名称漂移个人学校排除、仲裁同校单测与路由级 403、重分原因必填与并发幂等、真实 multipart 答题卡上传与对象读取。
+- 暂时移除字典管理中的“题号”页签、前端 API 与 `DictBundleDto.topics` 暴露；`Topic` 数据表和历史认领参照暂不删除，后续有实际应用时可恢复。
 
 ## [0.1.0] - 2026-09-02
 

@@ -96,5 +96,12 @@ test.describe.serial('阶段A后台管理', () => {
     await areaRow.getByText('删除').click();
     await page.getByRole('button', { name: /确\s*定/ }).click();
     await expect(page.getByRole('cell', { name: areaName })).toHaveCount(0);
+
+    // 字典增删必须写入审计日志
+    await page.goto('/admin/logs');
+    await page.getByPlaceholder('备注 / 关联账号编号').fill(areaName);
+    await page.getByPlaceholder('备注 / 关联账号编号').press('Enter');
+    await expect(page.getByText('新增字典项').first()).toBeVisible();
+    await expect(page.getByText('删除字典项').first()).toBeVisible();
   });
 });
