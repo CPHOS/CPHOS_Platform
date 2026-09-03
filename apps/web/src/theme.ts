@@ -8,7 +8,7 @@ const FONT =
 export const SHELL_THEMES = {
   platform: { brand: 'CPHOS 联考平台', colorPrimary: '#0969da', section: '平台' },
   cphos: { brand: 'CPHOS 工作台', colorPrimary: '#8250df', section: '工作台' },
-  admin: { brand: '管理后台', colorPrimary: '#cf222e', section: '管理' },
+  admin: { brand: '管理后台', colorPrimary: '#cf222e', section: '' },
 } as const;
 
 export type ShellKind = keyof typeof SHELL_THEMES;

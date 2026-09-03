@@ -10,14 +10,24 @@ import { useAuthStore } from '../stores/auth';
 import { SHELL_THEMES, shellTheme, type ShellKind } from '../theme';
 
 export interface ShellNavItem {
+  type?: 'item';
   key: string;
   label: string;
   icon?: ReactNode;
 }
 
+/** 分组标题：type:'group' 的条目仅作分区标题，子项平铺不折叠 */
+export interface ShellNavGroup {
+  type: 'group';
+  label: string;
+  children: ShellNavItem[];
+}
+
+export type ShellNavEntry = ShellNavItem | ShellNavGroup;
+
 interface ShellLayoutProps {
   kind: ShellKind;
-  nav: ShellNavItem[];
+  nav: ShellNavEntry[];
 }
 
 /** 通用三端壳：顶部导航（品牌/用户）+ 左侧分区 Sider + 内容区（页标题在内容顶部） */
@@ -30,14 +40,24 @@ export function ShellLayout({ kind, nav }: ShellLayoutProps) {
   const { token } = antdTheme.useToken();
   const [collapsed, setCollapsed] = useState(false);
 
-  const selectedKey = useMemo(() => {
-    const hit = [...nav].sort((a, b) => b.key.length - a.key.length).find((n) => location.pathname.startsWith(n.key));
-    return hit?.key ?? nav[0]?.key ?? '';
-  }, [location.pathname, nav]);
+  const flatNav = useMemo(() => nav.flatMap((n) => (n.type === 'group' ? n.children : [n])), [nav]);
 
-  const current = nav.find((n) => n.key === selectedKey);
+  const selectedKey = useMemo(() => {
+    const hit = [...flatNav].sort((a, b) => b.key.length - a.key.length).find((n) => location.pathname.startsWith(n.key));
+    return hit?.key ?? flatNav[0]?.key ?? '';
+  }, [location.pathname, flatNav]);
+
+  const current = flatNav.find((n) => n.key === selectedKey);
   const displayName = user?.displayName ?? user?.profile?.realName ?? user?.email ?? user?.loginName;
-  const menuItems: MenuProps['items'] = nav.map((n) => ({ key: n.key, icon: n.icon, label: n.label }));
+  const menuItems: MenuProps['items'] = nav.map((n) =>
+    n.type === 'group'
+      ? {
+          type: 'group',
+          label: n.label,
+          children: n.children.map((c) => ({ key: c.key, icon: c.icon, label: c.label })),
+        }
+      : { key: n.key, icon: n.icon, label: n.label },
+  );
 
   return (
     <ConfigProvider theme={shellTheme(kind)}>
@@ -100,17 +120,19 @@ export function ShellLayout({ kind, nav }: ShellLayoutProps) {
             trigger={null}
             style={{ borderRight: `1px solid ${token.colorBorderSecondary}`, overflowY: 'auto' }}
           >
-            <div
-              className="shell-section"
-              style={{
-                fontSize: 12,
-                color: token.colorTextSecondary,
-                padding: '16px 16px 8px',
-                letterSpacing: 1,
-              }}
-            >
-              {meta.section}
-            </div>
+            {meta.section && (
+              <div
+                className="shell-section"
+                style={{
+                  fontSize: 12,
+                  color: token.colorTextSecondary,
+                  padding: '16px 16px 8px',
+                  letterSpacing: 1,
+                }}
+              >
+                {meta.section}
+              </div>
+            )}
             <Menu
               mode="inline"
               selectedKeys={[selectedKey]}
